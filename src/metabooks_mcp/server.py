@@ -1,5 +1,6 @@
 """MCP Server para integração com a API REST v2 da Metabooks."""
 
+import argparse
 import os
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
@@ -31,30 +32,52 @@ async def lifespan(server: FastMCP) -> AsyncIterator[dict]:
         await client.aclose()
 
 
-mcp = FastMCP(
-    name="metabooks-mcp",
-    instructions=(
-        "Servidor MCP somente leitura para a API REST v2 da Metabooks. "
-        "Módulos disponíveis: busca de produtos no catálogo bibliográfico (busca booleana, "
-        "busca em lote por ISBN), detalhe de produto por UUID/ISBN/GTIN (JSON ou ONIX 3.0), "
-        "busca em índice para autocompletar, URLs de mídia/MMO e dados cadastrais de editoras. "
-        "Credenciais: METABOOKS_USERNAME/METABOOKS_PASSWORD (produção) "
-        "ou METABOOKS_METADATA_TOKEN (staging/rc). "
-        "Capas e mídias exigem tokens dedicados: METABOOKS_COVER_TOKEN e METABOOKS_MMO_TOKEN."
-    ),
-    lifespan=lifespan,
-)
-
-# Módulos de conteúdo bibliográfico
-produtos.register(mcp)
-capas.register(mcp)
-midia.register(mcp)
-indice.register(mcp)
-editora.register(mcp)
-
-
 def main() -> None:
-    mcp.run(transport="stdio")
+    parser = argparse.ArgumentParser(
+        prog="metabooks-mcp",
+        description=(
+            "MCP Server para a API REST v2 da Metabooks.\n\n"
+            "Normalmente invocado pelo Claude Desktop ou outro cliente MCP via stdio.\n\n"
+            "Variáveis de ambiente necessárias:\n"
+            "  METABOOKS_USERNAME / METABOOKS_PASSWORD  — autenticação em produção\n"
+            "  METABOOKS_METADATA_TOKEN                 — token de metadados (staging/rc)\n"
+            "  METABOOKS_COVER_TOKEN                    — token para URLs de capas\n"
+            "  METABOOKS_MMO_TOKEN                      — token para mídias (MMO)\n"
+            "  METABOOKS_BASE_URL                       — URL base (opcional, para override)\n\n"
+            "Configure em ~/.config/metabooks-mcp/.env ou como variáveis de ambiente."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "sse", "streamable-http"],
+        default="stdio",
+        help="Transporte MCP a usar (padrão: stdio)",
+    )
+    args = parser.parse_args()
+
+    # FastMCP é criado aqui (não no nível do módulo) para evitar que os handlers
+    # de atexit sejam registrados antes de --help sair via sys.exit().
+    mcp = FastMCP(
+        name="metabooks-mcp",
+        instructions=(
+            "Servidor MCP somente leitura para a API REST v2 da Metabooks. "
+            "Módulos disponíveis: busca de produtos no catálogo bibliográfico (busca booleana, "
+            "busca em lote por ISBN), detalhe de produto por UUID/ISBN/GTIN (JSON ou ONIX 3.0), "
+            "busca em índice para autocompletar, URLs de mídia/MMO e dados cadastrais de editoras. "
+            "Credenciais: METABOOKS_USERNAME/METABOOKS_PASSWORD (produção) "
+            "ou METABOOKS_METADATA_TOKEN (staging/rc). "
+            "Capas e mídias exigem tokens dedicados: METABOOKS_COVER_TOKEN e METABOOKS_MMO_TOKEN."
+        ),
+        lifespan=lifespan,
+    )
+    produtos.register(mcp)
+    capas.register(mcp)
+    midia.register(mcp)
+    indice.register(mcp)
+    editora.register(mcp)
+
+    mcp.run(transport=args.transport)
 
 
 if __name__ == "__main__":
