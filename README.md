@@ -49,6 +49,8 @@ Ao final, você deve ter uma pasta `C:\Metabooks-mcp` com os arquivos do projeto
 
 O Claude Desktop usa um arquivo de configuração para saber quais servidores MCP iniciar. Você precisa editar esse arquivo.
 
+> **Importante:** Feche o Claude Desktop **antes** de editar. Clique com o botão direito no ícone da bandeja do sistema → **Sair**. Se o Claude Desktop estiver aberto enquanto você edita, ele vai sobrescrever suas alterações ao reiniciar.
+
 1. Pressione `Win + R`, cole o caminho abaixo e pressione Enter:
    ```
    %APPDATA%\Claude
@@ -61,7 +63,11 @@ O Claude Desktop usa um arquivo de configuração para saber quais servidores MC
 
 ### Passo 4 — Adicionar o servidor Metabooks ao Claude Desktop
 
-Apague todo o conteúdo do arquivo e cole **um** dos blocos abaixo, de acordo com o tipo de credencial que você tem.
+Há dois casos — leia qual se aplica a você:
+
+#### Caso A: o arquivo está vazio ou não tem nenhum outro servidor MCP
+
+Cole o bloco completo abaixo (escolha de acordo com o tipo de credencial):
 
 **Se você tem usuário e senha Metabooks:**
 
@@ -98,11 +104,43 @@ Apague todo o conteúdo do arquivo e cole **um** dos blocos abaixo, de acordo co
 }
 ```
 
+#### Caso B: o arquivo já tem outros servidores MCP configurados
+
+**Não apague o conteúdo existente.** Encontre a linha `"mcpServers": {` e adicione a entrada do Metabooks dentro dela, separada por vírgula dos outros servidores. Exemplo de como o arquivo deve ficar:
+
+```json
+{
+  "mcpServers": {
+    "outro-servidor-existente": {
+      "command": "...",
+      "args": ["..."]
+    },
+    "metabooks": {
+      "command": "node",
+      "args": ["C:\\Metabooks-mcp\\dist\\index.cjs"],
+      "env": {
+        "TRANSPORT": "stdio",
+        "METABOOKS_USERNAME": "seu_usuario_aqui",
+        "METABOOKS_PASSWORD": "sua_senha_aqui"
+      }
+    }
+  }
+}
+```
+
+---
+
 Substitua `seu_usuario_aqui`, `sua_senha_aqui` ou `seu_token_aqui` pelos seus dados reais.
 
 Salve o arquivo (`Ctrl + S`).
 
-> **Atenção:** O JSON é sensível a vírgulas e aspas. Se algo não funcionar, confira que o texto está exatamente igual ao exemplo acima.
+> **Atenção:** O JSON é sensível a vírgulas e aspas. Verifique que cada servidor está separado por vírgula do próximo, e que não há vírgula após o último servidor.
+
+**Validar o JSON antes de abrir o Claude Desktop** (recomendado): abra o Prompt de Comando e execute:
+```
+node -e "JSON.parse(require('fs').readFileSync(process.env.APPDATA+'/Claude/claude_desktop_config.json','utf8'));console.log('JSON valido')"
+```
+Se aparecer `JSON valido`, está correto. Se aparecer um erro, revise o arquivo.
 
 ---
 
@@ -140,8 +178,14 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 - Verifique se substituiu os valores no JSON pelas suas credenciais reais.
 - O campo `TRANSPORT` deve ser exatamente `stdio` (letras minúsculas).
 
+**A entrada `metabooks` some toda vez que reinicio o Claude Desktop**
+- O Claude Desktop detecta erros de JSON e remove a entrada com problema para poder iniciar.
+- Causa mais comum: vírgula faltando ou sobrando, aspas erradas, ou arquivo editado com o Claude Desktop aberto.
+- **Sempre feche o Claude Desktop antes de editar o arquivo** (bandeja → Sair).
+- Valide o JSON antes de reabrir (veja o comando no Passo 4).
+
 **Tenho outro servidor MCP configurado no Claude Desktop**
-- Não apague os servidores existentes. Acrescente o bloco `"metabooks": { ... }` dentro de `"mcpServers"`, separado por vírgula dos outros.
+- Não apague os servidores existentes. Siga o **Caso B** do Passo 4.
 
 ---
 
