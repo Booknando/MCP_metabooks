@@ -5,19 +5,17 @@ Informações técnicas para quem vai modificar ou contribuir com o projeto.
 ## Estrutura do projeto
 
 ```
-metabooks-mcp-server/
-├── src/
-│   ├── index.ts            # Entrada: transporte stdio/HTTP, healthcheck, auth
-│   ├── constants.ts        # URLs, limites, tabelas de referência (mídia, productType, tax)
-│   ├── types.ts            # Tipos das respostas da API
-│   ├── schemas/index.ts    # Schemas Zod de entrada
-│   ├── services/
-│   │   ├── client.ts       # Cliente HTTP, seleção de token, tratamento de erro
-│   │   ├── credentials.ts  # Credenciais do ambiente (e por requisição no modo HTTP)
-│   │   └── format.ts       # Formatação markdown/JSON, paginação, truncamento
-│   └── tools/index.ts      # As 8 ferramentas de leitura
-├── dist/
-│   └── index.cjs           # Bundle pré-compilado (commitar após npm run bundle)
+metabooks-mcp/
+├── src/metabooks_mcp/
+│   ├── server.py           # FastMCP: lifespan, registro de módulos, entry point
+│   ├── client.py           # MetabooksClient: HTTP, autenticação, cache de token
+│   └── tools/
+│       ├── produtos.py     # search_products, batch_search_isbns, get_product, get_multiple_products
+│       ├── capas.py        # get_cover_url
+│       ├── midia.py        # get_media_assets (MMO)
+│       ├── indice.py       # index_search
+│       └── editora.py      # get_publisher
+├── pyproject.toml          # Build system (hatchling), dependências, entry point
 ├── .env.example            # Referência de variáveis de ambiente
 ├── DEVELOPERS.md           # Este arquivo
 └── README.md               # Guia de instalação para usuários finais
@@ -25,55 +23,67 @@ metabooks-mcp-server/
 
 ## Pré-requisitos de desenvolvimento
 
-- Node.js 18+
-- npm
+- Python 3.12+
+- pip
 
 ## Setup do ambiente de desenvolvimento
 
 ```bash
 git clone <url-do-repo> C:\Metabooks-mcp
 cd C:\Metabooks-mcp
-npm install
+pip install -e .
 ```
 
-## Scripts disponíveis
+A flag `-e` instala em modo editável: alterações em `src/` refletem imediatamente sem reinstalar.
 
-| Comando | O que faz |
-|---|---|
-| `npm run dev` | Inicia o servidor em modo desenvolvimento com hot-reload (`tsx watch`) |
-| `npm run build` | Compila TypeScript → `dist/` (checagem de tipos, sem bundle) |
-| `npm run bundle` | Gera bundle único `dist/index.cjs` via esbuild (para distribuição) |
-| `npm start` | Executa `dist/index.cjs` |
-| `npm run clean` | Remove a pasta `dist/` |
+## Como adicionar uma nova ferramenta
 
-## Como regenerar o bundle após alterar o código
+Cada módulo em `src/metabooks_mcp/tools/` segue o mesmo padrão:
 
-O arquivo `dist/index.cjs` é o que os usuários finais executam. Ele precisa ser regenerado e commitado sempre que `src/` mudar:
+```python
+from typing import Annotated, Optional
+from mcp.server.fastmcp import FastMCP, Context
+
+def register(mcp: FastMCP) -> None:
+
+    @mcp.tool()
+    async def metabooks_minha_ferramenta(
+        ctx: Context,
+        parametro: Annotated[str, "Descrição do parâmetro"],
+    ) -> dict:
+        """Descrição da ferramenta (aparece no Claude)."""
+        client = ctx.request_context.lifespan_context["metabooks"]
+        return await client.get("endpoint/path")
+```
+
+Depois, registre o novo módulo em `server.py`:
+
+```python
+from .tools import produtos, capas, midia, indice, editora, novo_modulo
+# ...
+novo_modulo.register(mcp)
+```
+
+## Testando com o MCP Inspector
 
 ```bash
-npm run bundle
-git add dist/index.cjs
-git commit -m "Atualiza bundle"
-git push
+metabooks-mcp --help
+npx @modelcontextprotocol/inspector metabooks-mcp
 ```
 
-O bundle é gerado com [esbuild](https://esbuild.github.io) em formato CommonJS, incluindo todas as dependências de runtime. O arquivo resultante tem ~2 MB e é autocontido — não requer `npm install` para execução.
+No Inspector, defina as variáveis de ambiente com suas credenciais antes de conectar.
 
-## Modo desenvolvimento local
+## Testando com o Claude Desktop em desenvolvimento
 
-Para testar com o Claude Desktop em modo desenvolvimento (sem rebuild do bundle):
-
-1. Execute `npm run dev` — isso inicia o servidor via `tsx` com hot-reload
-2. No `claude_desktop_config.json`, aponte para o `tsx` em vez do bundle:
+No `claude_desktop_config.json`, aponte para o módulo Python diretamente:
 
 ```json
 {
   "mcpServers": {
-    "metabooks": {
-      "command": "npx",
-      "args": ["tsx", "C:\\Metabooks-mcp\\src\\index.ts"],
+    "metabooks-dev": {
+      "command": "python",
+      "args": ["-m", "metabooks_mcp.server"],
       "env": {
-        "TRANSPORT": "stdio",
         "METABOOKS_USERNAME": "seu_usuario",
         "METABOOKS_PASSWORD": "sua_senha"
       }
@@ -82,73 +92,21 @@ Para testar com o Claude Desktop em modo desenvolvimento (sem rebuild do bundle)
 }
 ```
 
-## Testando com o MCP Inspector
-
-Para inspecionar as ferramentas sem o Claude Desktop:
-
-```bash
-npx @modelcontextprotocol/inspector node dist/index.cjs
-```
-
-No Inspector, defina as variáveis `TRANSPORT=stdio` e suas credenciais Metabooks antes de conectar.
-
-## Modo HTTP (multi-tenant)
-
-Além do modo `stdio` (para Claude Desktop), o servidor suporta HTTP para deployments em nuvem com múltiplos usuários. Nesse modo, as credenciais são passadas por request via headers:
-
-| Header | Variável equivalente |
-|---|---|
-| `X-Metabooks-Username` | `METABOOKS_USERNAME` |
-| `X-Metabooks-Password` | `METABOOKS_PASSWORD` |
-| `X-Metabooks-Metadata-Token` | `METABOOKS_METADATA_TOKEN` |
-| `X-Metabooks-Cover-Token` | `METABOOKS_COVER_TOKEN` |
-| `X-Metabooks-Mmo-Token` | `METABOOKS_MMO_TOKEN` |
-| `X-Metabooks-Base-Url` | `METABOOKS_BASE_URL` |
-
-Para subir em modo HTTP:
-
-```bash
-TRANSPORT=http node dist/index.cjs
-```
-
-O servidor sobe na porta `3000` com dois endpoints:
-- `POST /mcp` — endpoint MCP
-- `GET /health` — healthcheck
-
-Para proteger o endpoint com autenticação de gateway, defina `MCP_AUTH_TOKEN`.
-
-## Docker
-
-O projeto inclui um `Dockerfile` multi-stage para deployment em contêineres:
-
-```bash
-docker build -t metabooks-mcp .
-docker run -p 3000:3000 \
-  -e TRANSPORT=http \
-  -e METABOOKS_USERNAME=usuario \
-  -e METABOOKS_PASSWORD=senha \
-  metabooks-mcp
-```
-
-## Variáveis de ambiente completas
+## Variáveis de ambiente
 
 | Variável | Descrição |
 |---|---|
-| `TRANSPORT` | `stdio` (Claude Desktop) ou `http` (deployment) |
-| `METABOOKS_USERNAME` | Usuário Metabooks (modo login) |
-| `METABOOKS_PASSWORD` | Senha Metabooks (modo login) |
-| `METABOOKS_METADATA_TOKEN` | Token estático de metadados (alternativa ao login) |
-| `METABOOKS_COVER_TOKEN` | Token de capas (opcional) |
-| `METABOOKS_MMO_TOKEN` | Token de mídia/MMO (opcional) |
-| `METABOOKS_BASE_URL` | URL base da API (padrão: produção) |
-| `MCP_AUTH_TOKEN` | Token de gateway para modo HTTP (opcional) |
-| `REQUIRE_TENANT_CREDENTIALS` | `true` para exigir credenciais por request em modo HTTP |
+| `METABOOKS_USERNAME` | Usuário Metabooks (modo login, produção) |
+| `METABOOKS_PASSWORD` | Senha Metabooks (modo login, produção) |
+| `METABOOKS_METADATA_TOKEN` | Token estático de metadados (staging/rc, alternativa ao login) |
+| `METABOOKS_COVER_TOKEN` | Token de capas (opcional, exige contrato com MVB) |
+| `METABOOKS_MMO_TOKEN` | Token de mídia/MMO (opcional, exige contrato com MVB) |
+| `METABOOKS_BASE_URL` | URL base da API (padrão: `https://api.metabooks.com/api/v2`) |
 
 ## Tecnologias
 
-- [TypeScript](https://www.typescriptlang.org/) + Node.js 18+
-- [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk) — SDK oficial MCP
-- [axios](https://axios-http.com/) — cliente HTTP
-- [express](https://expressjs.com/) — servidor HTTP (modo multi-tenant)
-- [zod](https://zod.dev/) — validação de schemas
-- [esbuild](https://esbuild.github.io/) — bundler para distribuição
+- [Python 3.12+](https://www.python.org/)
+- [FastMCP](https://github.com/jlowin/fastmcp) — framework MCP de alto nível
+- [httpx](https://www.python-httpx.org/) — cliente HTTP assíncrono
+- [python-dotenv](https://github.com/theskumar/python-dotenv) — leitura de `.env`
+- [hatchling](https://hatch.pypa.io/) — build system

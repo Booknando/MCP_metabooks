@@ -10,7 +10,7 @@ Permite que o **Claude** consulte o catálogo Metabooks diretamente na conversa:
 
 Antes de começar, separe:
 
-- **Node.js** instalado no seu computador (explicado no Passo 1)
+- **Python 3.12+** instalado no seu computador (explicado no Passo 1)
 - **Claude Desktop** instalado ([baixe aqui](https://claude.ai/download))
 - Suas **credenciais Metabooks** — usuário e senha, **ou** um token de metadados fornecido pela MVB
 
@@ -18,36 +18,37 @@ Antes de começar, separe:
 
 ## Instalação passo a passo
 
-### Passo 1 — Instalar o Node.js
-
-O Node.js é o programa que executa o servidor Metabooks. Você provavelmente já tem ele instalado — veja como checar:
+### Passo 1 — Instalar o Python
 
 1. Pressione `Win + R`, digite `cmd` e pressione Enter para abrir o Prompt de Comando
 2. Digite o comando abaixo e pressione Enter:
    ```
-   node --version
+   python --version
    ```
-3. Se aparecer algo como `v20.11.0` (qualquer número ≥ 18), você já tem o Node.js. **Pule para o Passo 2.**
-4. Se aparecer um erro, baixe e instale o Node.js em [nodejs.org](https://nodejs.org) (escolha a versão **LTS**). Após instalar, reinicie o computador.
+3. Se aparecer algo como `Python 3.12.x` (qualquer número ≥ 3.12), você já tem o Python. **Pule para o Passo 2.**
+4. Se aparecer um erro, baixe e instale o Python em [python.org](https://www.python.org/downloads/) (escolha a versão mais recente).
+   - Durante a instalação, marque a opção **"Add Python to PATH"**.
+   - Após instalar, reinicie o computador.
 
 ---
 
-### Passo 2 — Baixar o Metabooks MCP
+### Passo 2 — Baixar e instalar o Metabooks MCP
 
-1. Nesta página do GitHub, clique no botão verde **`< > Code`** (no canto superior direito da lista de arquivos)
-2. Clique em **Download ZIP**
-3. Abra o arquivo ZIP baixado
-4. Extraia o conteúdo para a pasta **`C:\Metabooks-mcp`**
+1. Nesta página do GitHub, clique no botão verde **`< > Code`** e depois em **Download ZIP**
+2. Extraia o conteúdo para a pasta **`C:\Metabooks-mcp`**
+3. Abra o Prompt de Comando (`Win + R` → `cmd`) e execute:
+   ```
+   pip install C:\Metabooks-mcp
+   ```
 
-   > Se aparecer a pergunta "Deseja substituir arquivos existentes?", clique em **Sim**.
-
-Ao final, você deve ter uma pasta `C:\Metabooks-mcp` com os arquivos do projeto dentro.
+Isso instala o comando `metabooks-mcp` no seu Python. Para verificar, execute:
+```
+metabooks-mcp --help
+```
 
 ---
 
 ### Passo 3 — Abrir o arquivo de configuração do Claude Desktop
-
-O Claude Desktop usa um arquivo de configuração para saber quais servidores MCP iniciar. Você precisa editar esse arquivo.
 
 > **Importante:** Feche o Claude Desktop **antes** de editar. Clique com o botão direito no ícone da bandeja do sistema → **Sair**. Se o Claude Desktop estiver aberto enquanto você edita, ele vai sobrescrever suas alterações ao reiniciar.
 
@@ -55,8 +56,8 @@ O Claude Desktop usa um arquivo de configuração para saber quais servidores MC
    ```
    %APPDATA%\Claude
    ```
-2. Uma pasta se abrirá. Procure o arquivo **`claude_desktop_config.json`**.
-   - Se ele não existir, crie um arquivo de texto com esse nome exato (incluindo a extensão `.json`).
+2. Procure o arquivo **`claude_desktop_config.json`**.
+   - Se não existir, crie um arquivo de texto com esse nome exato (incluindo a extensão `.json`).
 3. Abra o arquivo com o **Bloco de Notas** (clique com o botão direito → Abrir com → Bloco de Notas).
 
 ---
@@ -67,7 +68,7 @@ Há dois casos — leia qual se aplica a você:
 
 #### Caso A: o arquivo está vazio ou não tem nenhum outro servidor MCP
 
-Cole o bloco completo abaixo (escolha de acordo com o tipo de credencial):
+Cole o bloco completo abaixo de acordo com o tipo de credencial:
 
 **Se você tem usuário e senha Metabooks:**
 
@@ -75,10 +76,8 @@ Cole o bloco completo abaixo (escolha de acordo com o tipo de credencial):
 {
   "mcpServers": {
     "metabooks": {
-      "command": "node",
-      "args": ["C:\\Metabooks-mcp\\dist\\index.cjs"],
+      "command": "metabooks-mcp",
       "env": {
-        "TRANSPORT": "stdio",
         "METABOOKS_USERNAME": "seu_usuario_aqui",
         "METABOOKS_PASSWORD": "sua_senha_aqui"
       }
@@ -93,10 +92,8 @@ Cole o bloco completo abaixo (escolha de acordo com o tipo de credencial):
 {
   "mcpServers": {
     "metabooks": {
-      "command": "node",
-      "args": ["C:\\Metabooks-mcp\\dist\\index.cjs"],
+      "command": "metabooks-mcp",
       "env": {
-        "TRANSPORT": "stdio",
         "METABOOKS_METADATA_TOKEN": "seu_token_aqui"
       }
     }
@@ -106,7 +103,7 @@ Cole o bloco completo abaixo (escolha de acordo com o tipo de credencial):
 
 #### Caso B: o arquivo já tem outros servidores MCP configurados
 
-**Não apague o conteúdo existente.** Encontre a linha `"mcpServers": {` e adicione a entrada do Metabooks dentro dela, separada por vírgula dos outros servidores. Exemplo de como o arquivo deve ficar:
+**Não apague o conteúdo existente.** Adicione a entrada do Metabooks dentro da chave `"mcpServers"`, separada por vírgula dos outros servidores:
 
 ```json
 {
@@ -116,10 +113,8 @@ Cole o bloco completo abaixo (escolha de acordo com o tipo de credencial):
       "args": ["..."]
     },
     "metabooks": {
-      "command": "node",
-      "args": ["C:\\Metabooks-mcp\\dist\\index.cjs"],
+      "command": "metabooks-mcp",
       "env": {
-        "TRANSPORT": "stdio",
         "METABOOKS_USERNAME": "seu_usuario_aqui",
         "METABOOKS_PASSWORD": "sua_senha_aqui"
       }
@@ -134,21 +129,15 @@ Substitua `seu_usuario_aqui`, `sua_senha_aqui` ou `seu_token_aqui` pelos seus da
 
 Salve o arquivo (`Ctrl + S`).
 
-> **Atenção:** O JSON é sensível a vírgulas e aspas. Verifique que cada servidor está separado por vírgula do próximo, e que não há vírgula após o último servidor.
-
-**Validar o JSON antes de abrir o Claude Desktop** (recomendado): abra o Prompt de Comando e execute:
-```
-node -e "JSON.parse(require('fs').readFileSync(process.env.APPDATA+'/Claude/claude_desktop_config.json','utf8'));console.log('JSON valido')"
-```
-Se aparecer `JSON valido`, está correto. Se aparecer um erro, revise o arquivo.
+> **Atenção:** O JSON é sensível a vírgulas e aspas. Cada servidor deve estar separado por vírgula do próximo, sem vírgula após o último.
 
 ---
 
 ### Passo 5 — Reiniciar o Claude Desktop
 
-Feche o Claude Desktop **completamente** (clique com o botão direito no ícone da bandeja do sistema → Sair) e abra de novo.
+Feche o Claude Desktop **completamente** (bandeja → Sair) e abra de novo.
 
-Após reiniciar, clique no ícone de **martelo** ou **conector** na interface do Claude. O servidor `metabooks` deve aparecer na lista com as ferramentas disponíveis.
+Após reiniciar, clique no ícone de **martelo** ou **conector** na interface do Claude. O servidor `metabooks` deve aparecer com as ferramentas disponíveis.
 
 ---
 
@@ -167,22 +156,22 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 ## Problemas comuns
 
 **O servidor não aparece no Claude Desktop**
-- Verifique se o arquivo `C:\Metabooks-mcp\dist\index.cjs` realmente existe.
-- Confirme que o arquivo `claude_desktop_config.json` foi salvo corretamente (sem erros de vírgula ou aspas no JSON).
+- Verifique se o `pip install` foi concluído sem erros.
+- Confirme que o `claude_desktop_config.json` foi salvo corretamente (sem erros de vírgula ou aspas).
 - Reinicie o Claude Desktop completamente (fechar pela bandeja, não só minimizar).
 
-**Erro: "node não foi reconhecido"**
-- O Node.js não está instalado ou não foi reiniciado o computador após a instalação. Instale em [nodejs.org](https://nodejs.org) e reinicie.
+**Erro: "metabooks-mcp não foi reconhecido"**
+- O Python não está no PATH ou a instalação via pip falhou.
+- Reinstale o Python marcando "Add Python to PATH" e tente o `pip install` novamente.
 
 **Erro de credenciais / "Sem credenciais de metadados"**
 - Verifique se substituiu os valores no JSON pelas suas credenciais reais.
-- O campo `TRANSPORT` deve ser exatamente `stdio` (letras minúsculas).
+- Aspas, maiúsculas e minúsculas importam.
 
 **A entrada `metabooks` some toda vez que reinicio o Claude Desktop**
-- O Claude Desktop detecta erros de JSON e remove a entrada com problema para poder iniciar.
+- O Claude Desktop remove entradas com erros de JSON para poder iniciar.
 - Causa mais comum: vírgula faltando ou sobrando, aspas erradas, ou arquivo editado com o Claude Desktop aberto.
 - **Sempre feche o Claude Desktop antes de editar o arquivo** (bandeja → Sair).
-- Valide o JSON antes de reabrir (veja o comando no Passo 4).
 
 **Tenho outro servidor MCP configurado no Claude Desktop**
 - Não apague os servidores existentes. Siga o **Caso B** do Passo 4.
@@ -193,9 +182,9 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 
 | Ferramenta | O que faz |
 |---|---|
-| Buscar por palavras-chave | Encontra livros por título, autor, editora, ISBN, palavra-chave e outros filtros |
+| Buscar por palavras-chave | Encontra livros por título, autor, editora, ISBN e outros filtros |
 | Busca em lote de ISBNs | Consulta até 500 ISBNs de uma vez |
-| Detalhes de um livro | Retorna todos os metadados de um título específico |
+| Detalhes de um livro | Retorna todos os metadados de um título (JSON ou ONIX 3.0) |
 | Detalhes de vários livros | Consulta vários UUIDs ao mesmo tempo |
 | Arquivos de mídia | Lista URLs de capa, sumário, amostras e foto do autor |
 | URL da capa | Retorna o link direto para a imagem da capa |
@@ -206,7 +195,7 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 
 ## Exemplos de busca
 
-Você pode pedir ao Claude diretamente em linguagem natural. Mas se quiser usar a sintaxe de busca avançada da Metabooks, aqui está uma referência:
+Você pode pedir ao Claude em linguagem natural. Se quiser usar a sintaxe avançada da Metabooks:
 
 | O que você quer | O que digitar |
 |---|---|
@@ -226,7 +215,7 @@ Combine com `and`, `or`, `not` e parênteses. Exemplo: `VL=Novatec and PF=E*` (e
 
 ## Usando capas e arquivos de mídia
 
-Por padrão, as ferramentas de **capa** e **mídia/MMO** precisam de tokens separados. Se a MVB forneceu esses tokens para você, acrescente as linhas abaixo no bloco `env` do seu `claude_desktop_config.json`:
+As ferramentas de **capa** e **mídia/MMO** precisam de tokens separados. Se a MVB forneceu esses tokens, acrescente no bloco `env` do `claude_desktop_config.json`:
 
 ```json
 "METABOOKS_COVER_TOKEN": "seu_token_de_cover",
@@ -254,7 +243,8 @@ URLs disponíveis:
 
 1. Baixe o novo ZIP do repositório (mesmo processo do Passo 2)
 2. Extraia e substitua os arquivos em `C:\Metabooks-mcp`
-3. Reinicie o Claude Desktop
+3. Execute novamente: `pip install C:\Metabooks-mcp`
+4. Reinicie o Claude Desktop
 
 Não é necessário alterar o `claude_desktop_config.json` — a configuração continua valendo.
 
