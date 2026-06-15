@@ -41,17 +41,22 @@ As outras 6 ferramentas funcionam só com login OU token de metadados.
 
 ## Instalação
 
-Baixe este projeto (clone ou ZIP) e, na pasta dele, rode:
+### Windows (caminho padrão: `C:\Metabooks-mcp`)
 
-```bash
-npm install
-npm run build
-```
+1. Faça o download deste repositório como ZIP (botão **Code → Download ZIP** no GitHub) e extraia em `C:\Metabooks-mcp`.
 
-Isso gera a pasta `dist/` com o servidor compilado (`dist/index.js`). Anote o **caminho completo** dessa pasta — você vai usá-lo na configuração do Claude Desktop. Exemplos:
+   _Ou, se tiver Git instalado:_
+   ```
+   git clone <url-do-repo> C:\Metabooks-mcp
+   ```
 
-- Windows: `C:\Users\voce\MCP_metabooks\dist\index.js`
-- macOS: `/Users/voce/MCP_metabooks/dist/index.js`
+2. Pronto. O servidor já vem **pré-compilado** em `dist\index.cjs` — não é necessário instalar dependências nem compilar nada.
+
+3. Siga para a seção **Configurar no Claude Desktop** abaixo.
+
+### macOS / Linux
+
+Mesmo processo — clone ou extraia o ZIP em qualquer pasta, por exemplo `~/Metabooks-mcp`. Use o caminho completo ao configurar o Claude Desktop.
 
 ## Configurar no Claude Desktop
 
@@ -73,7 +78,7 @@ O Claude Desktop é quem **inicia** o servidor automaticamente, passando as suas
   "mcpServers": {
     "metabooks": {
       "command": "node",
-      "args": ["C:\\Users\\voce\\MCP_metabooks\\dist\\index.js"],
+      "args": ["C:\\Metabooks-mcp\\dist\\index.cjs"],
       "env": {
         "TRANSPORT": "stdio",
         "METABOOKS_USERNAME": "seu_usuario",
@@ -91,7 +96,7 @@ O Claude Desktop é quem **inicia** o servidor automaticamente, passando as suas
   "mcpServers": {
     "metabooks": {
       "command": "node",
-      "args": ["C:\\Users\\voce\\MCP_metabooks\\dist\\index.js"],
+      "args": ["C:\\Metabooks-mcp\\dist\\index.cjs"],
       "env": {
         "TRANSPORT": "stdio",
         "METABOOKS_METADATA_TOKEN": "seu_token_de_metadados"
@@ -104,7 +109,7 @@ O Claude Desktop é quem **inicia** o servidor automaticamente, passando as suas
 Pontos importantes:
 
 - **`TRANSPORT` deve ser `stdio`** — é o que faz o servidor funcionar dentro do Claude Desktop.
-- No **Windows**, as barras invertidas do caminho precisam ser duplicadas no JSON (`\\`). No **macOS/Linux**, use barras normais (`/Users/voce/MCP_metabooks/dist/index.js`).
+- No **Windows**, as barras invertidas do caminho precisam ser duplicadas no JSON (`\\`). No **macOS/Linux**, use barras normais (`/Users/voce/Metabooks-mcp/dist/index.cjs`).
 - Para usar **capas/mídia**, acrescente no bloco `env`:
   ```json
   "METABOOKS_COVER_TOKEN": "seu_token_de_cover",
@@ -141,17 +146,30 @@ Definidas no bloco `env` da configuração do Claude Desktop (acima). Referênci
 
 ## Atualizando
 
-Se você mudar de credencial, edite o bloco `env` no `claude_desktop_config.json` e reinicie o Claude Desktop. Se baixar uma nova versão do código, rode `npm install && npm run build` de novo na pasta do projeto.
+Se você mudar de credencial, edite o bloco `env` no `claude_desktop_config.json` e reinicie o Claude Desktop.
+
+Se baixar uma nova versão do repositório, basta substituir a pasta — o `dist\index.cjs` já vem atualizado no download.
 
 ## Testando fora do Claude (opcional)
 
 Para inspecionar as ferramentas sem o Claude Desktop, use o MCP Inspector:
 
 ```bash
-npx @modelcontextprotocol/inspector node dist/index.js
+npx @modelcontextprotocol/inspector node C:\Metabooks-mcp\dist\index.cjs
 ```
 
 No Inspector, defina as variáveis de ambiente (`TRANSPORT=stdio`, `METABOOKS_USERNAME`/`METABOOKS_PASSWORD` ou `METABOOKS_METADATA_TOKEN`) e conecte.
+
+## Para desenvolvedores
+
+O arquivo `dist\index.cjs` é gerado a partir do código-fonte TypeScript em `src/` usando [esbuild](https://esbuild.github.io). Para regenerar após alterar o código:
+
+```bash
+npm install
+npm run bundle
+```
+
+Commite o novo `dist\index.cjs` junto com as alterações em `src/`.
 
 ## Sintaxe booleana da Metabooks (referência rápida)
 
@@ -186,6 +204,8 @@ metabooks-mcp-server/
 │   │   └── credentials.ts  # Credenciais do ambiente (e por requisição no modo HTTP)
 │   │   └── format.ts       # Formatação markdown/JSON, paginação, truncamento
 │   └── tools/index.ts      # As 8 ferramentas de leitura
+├── dist/
+│   └── index.cjs           # Bundle pré-compilado (commitar após npm run bundle)
 ├── .env.example
 └── README.md
 ```
