@@ -1,77 +1,69 @@
 # Metabooks MCP Server
 
-Servidor [MCP](https://modelcontextprotocol.io) **somente leitura** para a API REST v2 da [Metabooks](https://www.metabooks.com) (MVB). Permite que o Claude consulte metadados bibliográficos, capas, arquivos de mídia (MMO) e dados de editoras do catálogo Metabooks/VLB.
+Permite que o **Claude** consulte o catálogo Metabooks diretamente na conversa: busque livros, veja metadados completos, capas e dados de editoras — sem sair do chat.
 
-> **Roda no seu próprio computador.** O servidor é executado localmente pelo Claude Desktop (via `stdio`) usando as **suas** credenciais Metabooks. As credenciais ficam apenas na sua máquina, dentro da configuração do Claude Desktop — **nunca** trafegam para a internet nem para terceiros. Não há login na nuvem, não há servidor exposto.
+> O servidor roda **no seu próprio computador**. Suas credenciais Metabooks ficam salvas só na sua máquina e nunca saem dela.
 
-> Este servidor implementa **apenas operações de leitura** (GET e POST de consulta). A API da Metabooks não suporta inserção de dados.
+---
 
-## Ferramentas disponíveis
+## O que você vai precisar
 
-| Ferramenta | Endpoint | O que faz | Token |
-|---|---|---|---|
-| `metabooks_search_products` | `GET /products` | Busca por palavra-chave ou sintaxe booleana (AU, TI, VL, IS, ST, PF, RH, datas...) | login/metadata |
-| `metabooks_batch_search_isbns` | `POST /products` | Consulta até 500 ISBNs/GTINs de uma vez (aceita curingas `*`) | login/metadata |
-| `metabooks_get_product` | `GET /product/<id>` | Detalhe completo por UUID/ISBN/EAN/GTIN, em JSON-long ou ONIX 3.0 | login/metadata |
-| `metabooks_get_multiple_products` | `POST /product/multipleProducts` | Detalhe de vários UUIDs (JSON) | login/metadata |
-| `metabooks_get_media_assets` | `GET /asset/mmo/<uuid>` | Lista URLs de capas, sumário, amostras, foto do autor, etc. | mmo |
-| `metabooks_get_cover_url` | `GET /cover/<isbn>/<size>` | Monta a URL da capa por ISBN/GTIN (s/m/l/original) | cover |
-| `metabooks_index_search` | `GET /index/<field>/<term>` | Autocomplete em autor, editora, título, palavra-chave, série, etc. | login/metadata |
-| `metabooks_get_publisher` | `GET /publisher/<mvbid>` | Dados cadastrais da editora (nome, endereço, CNPJ, prefixos ISBN) | login/metadata |
+Antes de começar, separe:
 
-## Autenticação na Metabooks
+- **Node.js** instalado no seu computador (explicado no Passo 1)
+- **Claude Desktop** instalado ([baixe aqui](https://claude.ai/download))
+- Suas **credenciais Metabooks** — usuário e senha, **ou** um token de metadados fornecido pela MVB
 
-Você se autentica de **uma** destas formas (escolha a que a MVB liberou para você):
+---
 
-- **Usuário e senha** (produção): o servidor faz `POST /login` e renova o token automaticamente. Use `METABOOKS_USERNAME` + `METABOOKS_PASSWORD`.
-- **Token estático de metadados** (staging/rc): use `METABOOKS_METADATA_TOKEN`.
+## Instalação passo a passo
 
-Opcionalmente, para **capas** e **mídia/MMO** (seção 5.5.5 da spec — login/metadados **não** acessa esses recursos):
+### Passo 1 — Instalar o Node.js
 
-- `METABOOKS_COVER_TOKEN` — capas.
-- `METABOOKS_MMO_TOKEN` — arquivos de mídia (sumário, amostras, foto do autor...).
+O Node.js é o programa que executa o servidor Metabooks. Você provavelmente já tem ele instalado — veja como checar:
 
-As outras 6 ferramentas funcionam só com login OU token de metadados.
-
-## Pré-requisitos
-
-1. **Node.js 18 ou superior** (recomendado 20+). Baixe em [nodejs.org](https://nodejs.org).
-2. **Claude Desktop** instalado ([claude.ai/download](https://claude.ai/download)).
-3. Suas **credenciais Metabooks** (usuário/senha **ou** token de metadados).
-
-## Instalação
-
-### Windows (caminho padrão: `C:\Metabooks-mcp`)
-
-1. Faça o download deste repositório como ZIP (botão **Code → Download ZIP** no GitHub) e extraia em `C:\Metabooks-mcp`.
-
-   _Ou, se tiver Git instalado:_
+1. Pressione `Win + R`, digite `cmd` e pressione Enter para abrir o Prompt de Comando
+2. Digite o comando abaixo e pressione Enter:
    ```
-   git clone <url-do-repo> C:\Metabooks-mcp
+   node --version
    ```
+3. Se aparecer algo como `v20.11.0` (qualquer número ≥ 18), você já tem o Node.js. **Pule para o Passo 2.**
+4. Se aparecer um erro, baixe e instale o Node.js em [nodejs.org](https://nodejs.org) (escolha a versão **LTS**). Após instalar, reinicie o computador.
 
-2. Pronto. O servidor já vem **pré-compilado** em `dist\index.cjs` — não é necessário instalar dependências nem compilar nada.
+---
 
-3. Siga para a seção **Configurar no Claude Desktop** abaixo.
+### Passo 2 — Baixar o Metabooks MCP
 
-### macOS / Linux
+1. Nesta página do GitHub, clique no botão verde **`< > Code`** (no canto superior direito da lista de arquivos)
+2. Clique em **Download ZIP**
+3. Abra o arquivo ZIP baixado
+4. Extraia o conteúdo para a pasta **`C:\Metabooks-mcp`**
 
-Mesmo processo — clone ou extraia o ZIP em qualquer pasta, por exemplo `~/Metabooks-mcp`. Use o caminho completo ao configurar o Claude Desktop.
+   > Se aparecer a pergunta "Deseja substituir arquivos existentes?", clique em **Sim**.
 
-## Configurar no Claude Desktop
+Ao final, você deve ter uma pasta `C:\Metabooks-mcp` com os arquivos do projeto dentro.
 
-O Claude Desktop é quem **inicia** o servidor automaticamente, passando as suas credenciais por variáveis de ambiente. Basta editar um arquivo de configuração.
+---
 
-### 1. Abra o arquivo de configuração
+### Passo 3 — Abrir o arquivo de configuração do Claude Desktop
 
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+O Claude Desktop usa um arquivo de configuração para saber quais servidores MCP iniciar. Você precisa editar esse arquivo.
 
-> Atalho: no Claude Desktop, vá em **Settings → Developer → Edit Config**. Se o arquivo não existir, crie-o.
+1. Pressione `Win + R`, cole o caminho abaixo e pressione Enter:
+   ```
+   %APPDATA%\Claude
+   ```
+2. Uma pasta se abrirá. Procure o arquivo **`claude_desktop_config.json`**.
+   - Se ele não existir, crie um arquivo de texto com esse nome exato (incluindo a extensão `.json`).
+3. Abra o arquivo com o **Bloco de Notas** (clique com o botão direito → Abrir com → Bloco de Notas).
 
-### 2. Adicione o servidor
+---
 
-**Opção A — usuário e senha (produção):**
+### Passo 4 — Adicionar o servidor Metabooks ao Claude Desktop
+
+Apague todo o conteúdo do arquivo e cole **um** dos blocos abaixo, de acordo com o tipo de credencial que você tem.
+
+**Se você tem usuário e senha Metabooks:**
 
 ```json
 {
@@ -81,15 +73,15 @@ O Claude Desktop é quem **inicia** o servidor automaticamente, passando as suas
       "args": ["C:\\Metabooks-mcp\\dist\\index.cjs"],
       "env": {
         "TRANSPORT": "stdio",
-        "METABOOKS_USERNAME": "seu_usuario",
-        "METABOOKS_PASSWORD": "sua_senha"
+        "METABOOKS_USERNAME": "seu_usuario_aqui",
+        "METABOOKS_PASSWORD": "sua_senha_aqui"
       }
     }
   }
 }
 ```
 
-**Opção B — token de metadados (staging/rc):**
+**Se você tem token de metadados (staging/rc):**
 
 ```json
 {
@@ -99,122 +91,143 @@ O Claude Desktop é quem **inicia** o servidor automaticamente, passando as suas
       "args": ["C:\\Metabooks-mcp\\dist\\index.cjs"],
       "env": {
         "TRANSPORT": "stdio",
-        "METABOOKS_METADATA_TOKEN": "seu_token_de_metadados"
+        "METABOOKS_METADATA_TOKEN": "seu_token_aqui"
       }
     }
   }
 }
 ```
 
-Pontos importantes:
+Substitua `seu_usuario_aqui`, `sua_senha_aqui` ou `seu_token_aqui` pelos seus dados reais.
 
-- **`TRANSPORT` deve ser `stdio`** — é o que faz o servidor funcionar dentro do Claude Desktop.
-- No **Windows**, as barras invertidas do caminho precisam ser duplicadas no JSON (`\\`). No **macOS/Linux**, use barras normais (`/Users/voce/Metabooks-mcp/dist/index.cjs`).
-- Para usar **capas/mídia**, acrescente no bloco `env`:
-  ```json
-  "METABOOKS_COVER_TOKEN": "seu_token_de_cover",
-  "METABOOKS_MMO_TOKEN": "seu_token_de_mmo"
-  ```
-- Para apontar para outro ambiente (staging/rc), acrescente `"METABOOKS_BASE_URL": "https://staging.kubernetes.br.metabooks.com/api/v2"`. O padrão é produção.
-- Se o Claude Desktop não encontrar o `node`, troque `"command": "node"` pelo caminho completo do executável (ex.: `"C:\\Program Files\\nodejs\\node.exe"`).
+Salve o arquivo (`Ctrl + S`).
 
-### 3. Reinicie o Claude Desktop
+> **Atenção:** O JSON é sensível a vírgulas e aspas. Se algo não funcionar, confira que o texto está exatamente igual ao exemplo acima.
 
-Feche **totalmente** e abra de novo. O servidor `metabooks` deve aparecer na lista de ferramentas (ícone de conector/martelo). A partir daí é só pedir, por exemplo: *"busque na Metabooks os e-books com ST=Linux"*.
+---
 
-## Variáveis de ambiente
+### Passo 5 — Reiniciar o Claude Desktop
 
-Definidas no bloco `env` da configuração do Claude Desktop (acima). Referência em `.env.example`.
+Feche o Claude Desktop **completamente** (clique com o botão direito no ícone da bandeja do sistema → Sair) e abra de novo.
 
-| Variável | Quando usar | Descrição |
-|---|---|---|
-| `TRANSPORT` | Sempre | Use `stdio` para o Claude Desktop |
-| `METABOOKS_USERNAME` | Login (produção) | Usuário Metabooks |
-| `METABOOKS_PASSWORD` | Login (produção) | Senha Metabooks |
-| `METABOOKS_METADATA_TOKEN` | Alternativa ao login | Token de metadados (staging/rc) |
-| `METABOOKS_COVER_TOKEN` | Para capas | Token de capas (opcional) |
-| `METABOOKS_MMO_TOKEN` | Para mídias | Token de mídia/MMO (opcional) |
-| `METABOOKS_BASE_URL` | Não (opcional) | URL base. Padrão: produção |
+Após reiniciar, clique no ícone de **martelo** ou **conector** na interface do Claude. O servidor `metabooks` deve aparecer na lista com as ferramentas disponíveis.
 
-> É preciso configurar **login OU token de metadados**. Os tokens de cover/mmo são opcionais.
+---
 
-### URLs de ambiente
+### Passo 6 — Testar
 
+Na caixa de conversa do Claude, peça algo como:
+
+> *"Busque na Metabooks livros sobre Linux"*
+
+> *"Me dê os detalhes do ISBN 9788575228517"*
+
+Se o Claude responder com dados do catálogo Metabooks, a instalação está funcionando.
+
+---
+
+## Problemas comuns
+
+**O servidor não aparece no Claude Desktop**
+- Verifique se o arquivo `C:\Metabooks-mcp\dist\index.cjs` realmente existe.
+- Confirme que o arquivo `claude_desktop_config.json` foi salvo corretamente (sem erros de vírgula ou aspas no JSON).
+- Reinicie o Claude Desktop completamente (fechar pela bandeja, não só minimizar).
+
+**Erro: "node não foi reconhecido"**
+- O Node.js não está instalado ou não foi reiniciado o computador após a instalação. Instale em [nodejs.org](https://nodejs.org) e reinicie.
+
+**Erro de credenciais / "Sem credenciais de metadados"**
+- Verifique se substituiu os valores no JSON pelas suas credenciais reais.
+- O campo `TRANSPORT` deve ser exatamente `stdio` (letras minúsculas).
+
+**Tenho outro servidor MCP configurado no Claude Desktop**
+- Não apague os servidores existentes. Acrescente o bloco `"metabooks": { ... }` dentro de `"mcpServers"`, separado por vírgula dos outros.
+
+---
+
+## O que o Metabooks MCP consegue fazer
+
+| Ferramenta | O que faz |
+|---|---|
+| Buscar por palavras-chave | Encontra livros por título, autor, editora, ISBN, palavra-chave e outros filtros |
+| Busca em lote de ISBNs | Consulta até 500 ISBNs de uma vez |
+| Detalhes de um livro | Retorna todos os metadados de um título específico |
+| Detalhes de vários livros | Consulta vários UUIDs ao mesmo tempo |
+| Arquivos de mídia | Lista URLs de capa, sumário, amostras e foto do autor |
+| URL da capa | Retorna o link direto para a imagem da capa |
+| Autocomplete | Sugere autores, editoras, títulos e palavras-chave |
+| Dados de editora | Retorna nome, endereço, CNPJ e prefixos ISBN da editora |
+
+---
+
+## Exemplos de busca
+
+Você pode pedir ao Claude diretamente em linguagem natural. Mas se quiser usar a sintaxe de busca avançada da Metabooks, aqui está uma referência:
+
+| O que você quer | O que digitar |
+|---|---|
+| Busca geral | `ST=Linux` |
+| Por autor | `AU="Knuth, Donald"` |
+| Por título | `TI=algoritmos` |
+| Por editora | `VL=Novatec` |
+| Por ISBN | `IS=9788575228517` |
+| Somente e-books | `PF=E*` |
+| Por palavra-chave | `SW=programação` |
+| Por faixa de preço | `PR=40^80` |
+| Por data de atualização | `AD=20240101^20241231` |
+
+Combine com `and`, `or`, `not` e parênteses. Exemplo: `VL=Novatec and PF=E*` (e-books da Novatec).
+
+---
+
+## Usando capas e arquivos de mídia
+
+Por padrão, as ferramentas de **capa** e **mídia/MMO** precisam de tokens separados. Se a MVB forneceu esses tokens para você, acrescente as linhas abaixo no bloco `env` do seu `claude_desktop_config.json`:
+
+```json
+"METABOOKS_COVER_TOKEN": "seu_token_de_cover",
+"METABOOKS_MMO_TOKEN": "seu_token_de_mmo"
+```
+
+---
+
+## Ambientes disponíveis
+
+Por padrão, o servidor acessa a **produção**. Para usar staging ou RC, acrescente no bloco `env`:
+
+```json
+"METABOOKS_BASE_URL": "https://staging.kubernetes.br.metabooks.com/api/v2"
+```
+
+URLs disponíveis:
 - Produção (padrão): `https://api.metabooks.com/api/v2`
 - Staging: `https://staging.kubernetes.br.metabooks.com/api/v2`
 - RC: `https://rc.kubernetes.br.metabooks.com/api/v2`
 
-## Atualizando
+---
 
-Se você mudar de credencial, edite o bloco `env` no `claude_desktop_config.json` e reinicie o Claude Desktop.
+## Atualizando para uma nova versão
 
-Se baixar uma nova versão do repositório, basta substituir a pasta — o `dist\index.cjs` já vem atualizado no download.
+1. Baixe o novo ZIP do repositório (mesmo processo do Passo 2)
+2. Extraia e substitua os arquivos em `C:\Metabooks-mcp`
+3. Reinicie o Claude Desktop
 
-## Testando fora do Claude (opcional)
+Não é necessário alterar o `claude_desktop_config.json` — a configuração continua valendo.
 
-Para inspecionar as ferramentas sem o Claude Desktop, use o MCP Inspector:
-
-```bash
-npx @modelcontextprotocol/inspector node C:\Metabooks-mcp\dist\index.cjs
-```
-
-No Inspector, defina as variáveis de ambiente (`TRANSPORT=stdio`, `METABOOKS_USERNAME`/`METABOOKS_PASSWORD` ou `METABOOKS_METADATA_TOKEN`) e conecte.
-
-## Para desenvolvedores
-
-O arquivo `dist\index.cjs` é gerado a partir do código-fonte TypeScript em `src/` usando [esbuild](https://esbuild.github.io). Para regenerar após alterar o código:
-
-```bash
-npm install
-npm run bundle
-```
-
-Commite o novo `dist\index.cjs` junto com as alterações em `src/`.
-
-## Sintaxe booleana da Metabooks (referência rápida)
-
-Operadores combináveis com `and` / `or` / `not`, parênteses permitidos. **Não** faça URL-encoding — o servidor cuida disso.
-
-| Chave | Campo | Exemplo |
-|---|---|---|
-| `ST=` | quick search | `ST=Linux` |
-| `AU=` | autor | `AU="May, Karl"` |
-| `TI=` | título | `TI=gymnastik` |
-| `VL=` | editora | `VL=Artmed` |
-| `IS=` | identificador | `IS=9783765732324` |
-| `SW=` | palavra-chave | `SW=Glück` |
-| `WG=` | grupo de produto | `WG=?250` |
-| `PF=` | forma (ONIX 2.1) | `PF=E*` (digitais) |
-| `PD=` | forma detalhe (ONIX 3.0) | `PD=E101` |
-| `RH=` | série/hierarquia | `RH=RC712` |
-| `AD=` | data de modificação | `AD=20190301^20190815` |
-| `PR=` | preço | `PR=14^15` |
-
-## Estrutura do projeto
-
-```
-metabooks-mcp-server/
-├── src/
-│   ├── index.ts            # Entrada: transporte stdio/HTTP, healthcheck, auth
-│   ├── constants.ts        # URLs, limites, tabelas de referência (mídia, productType, tax)
-│   ├── types.ts            # Tipos das respostas da API
-│   ├── schemas/index.ts    # Schemas Zod de entrada
-│   ├── services/
-│   │   ├── client.ts       # Cliente HTTP, seleção de token, tratamento de erro
-│   │   └── credentials.ts  # Credenciais do ambiente (e por requisição no modo HTTP)
-│   │   └── format.ts       # Formatação markdown/JSON, paginação, truncamento
-│   └── tools/index.ts      # As 8 ferramentas de leitura
-├── dist/
-│   └── index.cjs           # Bundle pré-compilado (commitar após npm run bundle)
-├── .env.example
-└── README.md
-```
+---
 
 ## Segurança
 
-- As credenciais ficam **só na sua máquina**, no `claude_desktop_config.json`. Não compartilhe esse arquivo.
-- Os tokens da Metabooks nunca saem do seu computador: o servidor roda localmente e fala direto com a API da Metabooks.
+- Suas credenciais ficam **só no seu computador**, dentro do `claude_desktop_config.json`.
+- O servidor roda localmente e se comunica diretamente com a API da Metabooks — nenhum dado passa por servidores de terceiros.
+- Não compartilhe o arquivo `claude_desktop_config.json` com outras pessoas.
+
+---
 
 ## Licença
 
 Uso interno Booknando. A API Metabooks pertence à MVB.
+
+---
+
+> Informações técnicas para desenvolvedores: consulte [DEVELOPERS.md](DEVELOPERS.md).
