@@ -167,6 +167,7 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 **Erro de credenciais / "Sem credenciais de metadados"**
 - Verifique se substituiu os valores no JSON pelas suas credenciais reais.
 - Aspas, maiúsculas e minúsculas importam.
+- Se você fez várias tentativas seguidas e passou a receber erro de login, pode ser um bloqueio temporário da API (não senha errada). Aguarde alguns minutos e tente de novo.
 
 **A entrada `metabooks` some toda vez que reinicio o Claude Desktop**
 - O Claude Desktop remove entradas com erros de JSON para poder iniciar.

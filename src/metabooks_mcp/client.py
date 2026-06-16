@@ -64,10 +64,16 @@ class MetabooksClient:
                 "Login falhou: credenciais inválidas. Verifique METABOOKS_USERNAME/METABOOKS_PASSWORD."
             )
         response.raise_for_status()
-        data = response.json()
+        # A API de produção retorna o token como string crua (sem content-type JSON),
+        # então response.json() estoura. Tenta JSON e cai para o corpo bruto.
+        try:
+            data = response.json()
+        except ValueError:
+            data = response.text
         if isinstance(data, str):
-            return data.strip()
-        token = data.get("accessToken") or data.get("access_token") or data.get("token", "")
+            token = data.strip().strip('"')
+        else:
+            token = data.get("accessToken") or data.get("access_token") or data.get("token", "")
         if not token:
             raise MetabooksError(
                 "Login bem-sucedido, mas não foi possível extrair o accessToken da resposta."
