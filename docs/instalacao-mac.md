@@ -180,8 +180,10 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 | Detalhes de um livro | Retorna todos os metadados de um título (JSON ou ONIX 3.0) |
 | Detalhes de vários livros | Consulta vários UUIDs ao mesmo tempo |
 | Visualizar capa | Exibe a imagem da capa direto na conversa (exige token de capa) |
-| URL da capa | Retorna o link direto para a imagem da capa |
-| Arquivos de mídia | Lista URLs de capa, sumário, amostras e foto do autor |
+| URL da capa | Retorna o link direto para a imagem da capa (uso autenticado; não abre no navegador) |
+| Listar mídias | Lista as mídias do título (quarta capa, miolo, sumário, foto do autor) |
+| Visualizar mídia | Exibe uma imagem de mídia (quarta capa, miolo, foto do autor) direto na conversa |
+| Baixar mídia | Salva qualquer mídia em arquivo — capas extras, miolo, sumário em PDF, áudio |
 | Autocomplete | Sugere autores, editoras, títulos e palavras-chave |
 | Dados de editora | Retorna nome, endereço, CNPJ e prefixos ISBN da editora |
 

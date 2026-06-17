@@ -193,8 +193,10 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 | Detalhes de vários livros | Consulta vários UUIDs ao mesmo tempo |
 | Visualizar capa | Exibe a imagem da capa direto na conversa, em tamanho leve (exige token de capa) |
 | Baixar capa | Salva a capa em arquivo no disco — use para o tamanho original (exige token de capa) |
-| URL da capa | Retorna o link direto para a imagem da capa |
-| Arquivos de mídia | Lista URLs de capa, sumário, amostras e foto do autor |
+| URL da capa | Retorna o link direto para a imagem da capa (uso autenticado; não abre no navegador) |
+| Listar mídias | Lista as mídias do título (quarta capa, miolo, sumário, foto do autor) com seus `asset_id` |
+| Visualizar mídia | Exibe uma imagem de mídia (quarta capa, miolo, foto do autor) direto na conversa (exige token de MMO) |
+| Baixar mídia | Salva qualquer mídia em arquivo — capas extras, miolo, sumário em PDF, áudio (exige token de MMO) |
 | Autocomplete | Sugere autores, editoras, títulos e palavras-chave |
 | Dados de editora | Retorna nome, endereço, CNPJ e prefixos ISBN da editora |
 
@@ -232,6 +234,8 @@ As ferramentas de **capa** e **mídia/MMO** precisam de tokens separados. Se a M
 Com o token de capa configurado, peça por exemplo *"mostre a capa do ISBN 9788530951382"* e o Claude exibe a imagem direto na conversa (a capa é baixada e devolvida como imagem — o token nunca aparece numa URL).
 
 Para exibição, o tamanho é gerenciado automaticamente (versões leves, que sempre renderizam inline). A capa em **tamanho original** (~1,3 MB) não aparece bem inline em alguns clientes — para ela, peça *"baixe a capa original do ISBN 9788530951382"* e o Claude salva o arquivo em disco (por padrão na pasta `Downloads`).
+
+Com o **token de MMO**, o Claude também acessa as **demais mídias** do título — quarta capa, amostras do miolo, foto do autor, sumário em PDF etc. Peça *"mostre a quarta capa"* ou *"mostre as amostras do miolo"* e a imagem aparece **inline** (é baixada e reduzida para renderizar bem; o token nunca vai numa URL). Para arquivos que não são imagem (sumário em PDF, áudio) ou para a imagem em resolução original, peça *"baixe o sumário"* e o Claude salva em disco. As URLs cruas de mídia **não abrem no navegador** — exigem o token no cabeçalho —, por isso a exibição é sempre feita pela própria ferramenta, sem links.
 
 ---
 

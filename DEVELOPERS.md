@@ -39,10 +39,13 @@ Todos os endpoints da especificação (seção 6.1) estão implementados:
 | Editora | GET | `/publisher/{mvbid}` | `metabooks_get_publisher` |
 | Capa (URL) | GET | `/cover/{id}[/{size}]` | `metabooks_get_cover_url` |
 | Capa (imagem) | GET | `/cover/{id}[/{size}]` | `metabooks_view_cover` (JPEG inline) |
-| Mídia/MMO | GET | `/asset/mmo/{productId}` | `metabooks_get_media_assets` |
+| Mídia/MMO (listar) | GET | `/asset/mmo/{productId}` | `metabooks_get_media_assets` (sem URL; expõe `asset_id`) |
+| Mídia/MMO (imagem) | GET | `/asset/mmo/file/{id}` | `metabooks_view_media_asset` (JPEG inline, reduzido c/ Pillow) |
+| Mídia/MMO (download) | GET | `/asset/mmo/file/{id}` | `metabooks_download_media_asset` (qualquer tipo, p/ disco) |
 
 Notas de design:
 - **Capas** são baixadas via `client.get_bytes` com o token de capa no cabeçalho `Authorization` e devolvidas como imagem — o token nunca é exposto numa URL (seção 5.5.5 / 5.10.1).
+- **Mídias/MMO**: `get_media_assets` **não devolve a URL crua** (auth-gated, não abre no navegador) — expõe um `asset_id` estável. `view_media_asset` e `download_media_asset` resolvem o `asset_id` para a URL do listing e buscam o binário via `client.get_bytes_from_url` (guarda de host anti-SSRF). A capa frontal listada aponta para o endpoint `/cover` (token de capa); os demais arquivos usam o token de MMO — o scope é decidido pela URL. Imagens exibidas inline são reduzidas com Pillow (lado maior ≤ 1024 px) para garantir o render.
 - **Logout** só é disparado para login status-based (usuário/senha); com token estático é no-op.
 - Detalhe de produto suporta `json` (long), `onix30-short` e `onix30-ref`. ONIX 2.1 (legado) não é exposto.
 - Listas (`/products`, `/product/multipleProducts`) são sempre `application/json` (long).
@@ -144,4 +147,5 @@ No `claude_desktop_config.json`, aponte para o módulo Python diretamente:
 - [FastMCP](https://github.com/jlowin/fastmcp) — framework MCP de alto nível
 - [httpx](https://www.python-httpx.org/) — cliente HTTP assíncrono
 - [python-dotenv](https://github.com/theskumar/python-dotenv) — leitura de `.env`
+- [Pillow](https://python-pillow.org/) — redução de imagens de mídia para exibição inline
 - [hatchling](https://hatch.pypa.io/) — build system

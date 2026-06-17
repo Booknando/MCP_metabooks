@@ -1,6 +1,6 @@
 [project]
 name = "metabooks-mcp"
-version = "2.1.1"
+version = "2.2.0"
 description = "MCP Server para a API REST v2 da Metabooks: metadados bibliográficos, capas, mídias e editoras."
 readme = "README.md"
 license = { text = "MIT" }
@@ -17,6 +17,7 @@ dependencies = [
     "httpx>=0.28.0",
     "mcp[cli]>=1.26.0",
     "python-dotenv>=1.2.0",
+    "pillow>=10.0.0",
 ]
 
 [project.scripts]

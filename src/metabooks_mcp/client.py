@@ -3,6 +3,7 @@
 import time
 import httpx
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 DEFAULT_BASE_URL = "https://api.metabooks.com/api/v2"
 TOKEN_TTL = 50 * 60  # 50 minutos (API expira em 60 min — seção 5.5.1.2)
@@ -166,6 +167,33 @@ class MetabooksClient:
         """
         token = await self._token_for(scope)
         url = f"{self.base_url}/{path.lstrip('/')}"
+        headers = {"Authorization": f"Bearer {token}", "Accept": accept}
+        response = await self._http.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        return response.content
+
+    async def get_bytes_from_url(
+        self,
+        url: str,
+        scope: Scope = "mmo",
+        accept: str = "*/*",
+        params: dict | None = None,
+    ) -> bytes:
+        """GET binário de uma URL ABSOLUTA autenticada (ex.: links de mídia/MMO).
+
+        O endpoint de mídia (`/asset/mmo/{productId}`) devolve URLs de arquivo já
+        prontas (apontando para `/api/v1/asset/mmo/file/{id}`), enquanto a base é
+        `/api/v2`. Buscar a URL exata do listing evita reconstruir o path e é
+        robusto a v1/v2. Guarda anti-SSRF: só busca se o host bater com base_url —
+        assim o token nunca vaza para um host arbitrário.
+        """
+        base_host = urlparse(self.base_url).hostname
+        target_host = urlparse(url).hostname
+        if not target_host or target_host.lower() != (base_host or "").lower():
+            raise MetabooksError(
+                f"URL fora do host permitido ({base_host}): {url}"
+            )
+        token = await self._token_for(scope)
         headers = {"Authorization": f"Bearer {token}", "Accept": accept}
         response = await self._http.get(url, headers=headers, params=params)
         response.raise_for_status()

@@ -1,15 +1,10 @@
 """Tools de Capas — endpoint: /cover"""
 
 import os
-import tempfile
 from typing import Annotated, Literal
 from mcp.server.fastmcp import FastMCP, Context, Image
 
-
-def _default_download_dir() -> str:
-    """Pasta padrão para salvar capas: ~/Downloads (se existir) ou pasta temp."""
-    downloads = os.path.join(os.path.expanduser("~"), "Downloads")
-    return downloads if os.path.isdir(downloads) else tempfile.gettempdir()
+from ._files import resolve_target
 
 
 def register(mcp: FastMCP) -> None:
@@ -109,19 +104,7 @@ def register(mcp: FastMCP) -> None:
             }
 
         filename = f"capa_{id}_{size}.jpg"
-        if dest is None:
-            target = os.path.join(_default_download_dir(), filename)
-        else:
-            dest = os.path.expanduser(dest)
-            # Pasta (existente ou terminada em separador) → anexa o nome gerado;
-            # caminho com extensão → usa como arquivo; senão, trata como pasta.
-            if os.path.isdir(dest) or dest.endswith(("/", "\\")):
-                target = os.path.join(dest, filename)
-            elif os.path.splitext(dest)[1]:
-                target = dest
-            else:
-                target = os.path.join(dest, filename)
-        target = os.path.abspath(target)
+        target = resolve_target(dest, filename)
         try:
             os.makedirs(os.path.dirname(target), exist_ok=True)
             with open(target, "wb") as fh:
@@ -148,10 +131,11 @@ def register(mcp: FastMCP) -> None:
     ) -> dict:
         """Monta a URL canônica de capa de um título por ISBN/GTIN.
 
-        A URL retornada NÃO contém o token — o acesso continua exigindo o token
-        de capa (cabeçalho Authorization Bearer ou parâmetro ?access_token=).
-        Para ver a imagem direto na conversa, use metabooks_view_cover.
-        Exige METABOOKS_COVER_TOKEN configurado para o acesso efetivo.
+        ATENÇÃO: esta URL NÃO abre no navegador nem deve ser colada como imagem
+        markdown — ela exige o token de capa no cabeçalho Authorization, então
+        abri-la diretamente devolve 401/403. Use-a só em pipelines autenticados.
+        Para EXIBIR a capa na conversa, use metabooks_view_cover (devolve a imagem
+        inline, sem URL). Exige METABOOKS_COVER_TOKEN para o acesso efetivo.
         """
         client = ctx.request_context.lifespan_context["metabooks"]
         size_segment = f"/{size}" if size != "original" else ""
@@ -162,4 +146,6 @@ def register(mcp: FastMCP) -> None:
             "cover_url": cover_url,
             "auth": "Requer token de capa (Authorization: Bearer ... ou ?access_token=...).",
             "accept": "Envie 'Accept: */*' — o servidor responde 406 a 'image/jpeg' e 403 a 'image/*'.",
+            "browser_openable": False,
+            "display_hint": "Para exibir na conversa use metabooks_view_cover (NÃO cole esta URL como imagem).",
         }
