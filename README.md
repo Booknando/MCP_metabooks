@@ -168,6 +168,27 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 - O Python não está no PATH ou a instalação via pip falhou.
 - Reinstale o Python marcando "Add Python to PATH" e tente o `pip install` novamente.
 
+**Aviso ao instalar: "The script metabooks-mcp.exe is installed in '...\Scripts' which is not on PATH"**
+- A instalação **funcionou** — esse aviso apenas diz que a pasta onde o comando `metabooks-mcp.exe` foi colocado **não está no PATH** do Windows. Se você não corrigir, o Claude Desktop não encontra o comando e dá o erro *"metabooks-mcp não foi reconhecido"* (acima).
+- O próprio aviso mostra o caminho exato da pasta `Scripts` — algo como `C:\Users\SEU_USUARIO\AppData\Local\Python\pythoncore-3.14-64\Scripts`. **Copie esse caminho**, ele será usado nas soluções abaixo.
+
+  **Solução A — adicionar a pasta ao PATH (recomendada):** a configuração da documentação (`"command": "metabooks-mcp"`) passa a funcionar sem alterações.
+  1. Menu Iniciar → digite *"variáveis de ambiente"* → abra **Editar as variáveis de ambiente do usuário**.
+  2. Em **Variáveis de usuário**, selecione `Path` → **Editar** → **Novo** → cole o caminho da pasta `Scripts` → **OK** em todas as janelas.
+  3. Feche o Claude Desktop pela bandeja (**Sair**) e abra de novo — programas só leem o PATH novo ao reiniciar.
+
+  Alternativa por linha de comando (PowerShell), substituindo o caminho pelo seu:
+  ```powershell
+  $dir = 'C:\Users\SEU_USUARIO\AppData\Local\Python\pythoncore-3.14-64\Scripts'
+  [Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User') + ';' + $dir, 'User')
+  ```
+
+  **Solução B — usar o caminho completo na configuração (sem mexer no PATH):** no `claude_desktop_config.json`, troque `"command": "metabooks-mcp"` pelo caminho completo do executável, com **barras duplas**:
+  ```json
+  "command": "C:\\Users\\SEU_USUARIO\\AppData\\Local\\Python\\pythoncore-3.14-64\\Scripts\\metabooks-mcp.exe"
+  ```
+  Atenção: esse caminho fica preso à versão do Python — se você atualizar o Python depois, ajuste o caminho.
+
 **Erro de credenciais / "Sem credenciais de metadados"**
 - Verifique se substituiu os valores no JSON pelas suas credenciais reais.
 - Aspas, maiúsculas e minúsculas importam.
