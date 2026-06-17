@@ -80,6 +80,27 @@ class MetabooksClient:
             )
         return str(token).strip()
 
+    async def logout(self) -> None:
+        """Libera o token de login no servidor (seção 5.5.3.2).
+
+        Só faz sentido para login status-based (usuário/senha): cada login ocupa
+        um slot paralelo limitado pela MVB, que de outra forma só é liberado após
+        o timeout de 60 min. Tokens estáticos (metadata_token) não fazem login,
+        então não há nada a deslogar. Best-effort: erros são ignorados.
+        """
+        if self.metadata_token or not self._login_token:
+            return
+        try:
+            await self._http.get(
+                f"{self.base_url}/logout",
+                headers={"Authorization": f"Bearer {self._login_token}"},
+            )
+        except Exception:
+            pass
+        finally:
+            self._login_token = None
+            self._token_expires_at = 0.0
+
     async def _token_for(self, scope: Scope) -> str:
         if scope == "metadata":
             return await self._get_metadata_token()
@@ -129,6 +150,26 @@ class MetabooksClient:
             else:
                 raise
         return response.json() if accept == "application/json" else response.text
+
+    async def get_bytes(
+        self,
+        path: str,
+        scope: Scope = "metadata",
+        params: dict | None = None,
+        accept: str = "*/*",
+    ) -> bytes:
+        """GET autenticado que retorna o corpo binário (capas, mídias).
+
+        Usado para baixar a imagem da capa (image/jpeg) e devolvê-la diretamente,
+        sem expor o token numa URL — a seção 5.5.5/5.10.1 da especificação pede
+        que o token não seja legível a partir da URL da capa.
+        """
+        token = await self._token_for(scope)
+        url = f"{self.base_url}/{path.lstrip('/')}"
+        headers = {"Authorization": f"Bearer {token}", "Accept": accept}
+        response = await self._http.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        return response.content
 
     async def post(
         self,

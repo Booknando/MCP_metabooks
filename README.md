@@ -18,6 +18,8 @@ Antes de começar, separe:
 
 ## Instalação passo a passo
 
+> 🍎 **No Mac?** Os caminhos e comandos são diferentes (o executável não fica no PATH do Claude Desktop). Siga o guia dedicado: **[docs/instalacao-mac.md](docs/instalacao-mac.md)**. As instruções abaixo são para **Windows**.
+
 ### Passo 1 — Instalar o Python
 
 1. Pressione `Win + R`, digite `cmd` e pressione Enter para abrir o Prompt de Comando
@@ -149,6 +151,8 @@ Na caixa de conversa do Claude, peça algo como:
 
 > *"Me dê os detalhes do ISBN 9788575228517"*
 
+> *"Mostre a capa do ISBN 9788530951382"* (exige token de capa configurado)
+
 Se o Claude responder com dados do catálogo Metabooks, a instalação está funcionando.
 
 ---
@@ -187,8 +191,9 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 | Busca em lote de ISBNs | Consulta até 500 ISBNs de uma vez |
 | Detalhes de um livro | Retorna todos os metadados de um título (JSON ou ONIX 3.0) |
 | Detalhes de vários livros | Consulta vários UUIDs ao mesmo tempo |
-| Arquivos de mídia | Lista URLs de capa, sumário, amostras e foto do autor |
+| Visualizar capa | Exibe a imagem da capa direto na conversa (exige token de capa) |
 | URL da capa | Retorna o link direto para a imagem da capa |
+| Arquivos de mídia | Lista URLs de capa, sumário, amostras e foto do autor |
 | Autocomplete | Sugere autores, editoras, títulos e palavras-chave |
 | Dados de editora | Retorna nome, endereço, CNPJ e prefixos ISBN da editora |
 
@@ -223,6 +228,8 @@ As ferramentas de **capa** e **mídia/MMO** precisam de tokens separados. Se a M
 "METABOOKS_MMO_TOKEN": "seu_token_de_mmo"
 ```
 
+Com o token de capa configurado, peça por exemplo *"mostre a capa do ISBN 9788530951382"* e o Claude exibe a imagem direto na conversa (a capa é baixada e devolvida como imagem — o token nunca aparece numa URL).
+
 ---
 
 ## Ambientes disponíveis
@@ -237,6 +244,8 @@ URLs disponíveis:
 - Produção (padrão): `https://api.metabooks.com/api/v2`
 - Staging: `https://staging.kubernetes.br.metabooks.com/api/v2`
 - RC: `https://rc.kubernetes.br.metabooks.com/api/v2`
+
+> No ambiente de teste (staging/rc), o acesso é **exclusivamente via token**. Em produção, funciona tanto por login (usuário/senha) quanto por token.
 
 ---
 
@@ -266,3 +275,4 @@ Uso interno Booknando. A API Metabooks pertence à MVB.
 ---
 
 > Informações técnicas para desenvolvedores: consulte [DEVELOPERS.md](DEVELOPERS.md).
+> Instalação no macOS: consulte [docs/instalacao-mac.md](docs/instalacao-mac.md).

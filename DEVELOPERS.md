@@ -7,19 +7,45 @@ Informações técnicas para quem vai modificar ou contribuir com o projeto.
 ```
 metabooks-mcp/
 ├── src/metabooks_mcp/
-│   ├── server.py           # FastMCP: lifespan, registro de módulos, entry point
-│   ├── client.py           # MetabooksClient: HTTP, autenticação, cache de token
+│   ├── server.py           # FastMCP: lifespan (login/logout), registro de módulos, entry point
+│   ├── client.py           # MetabooksClient: HTTP, autenticação, cache de token, logout, get_bytes
 │   └── tools/
 │       ├── produtos.py     # search_products, batch_search_isbns, get_product, get_multiple_products
-│       ├── capas.py        # get_cover_url
+│       ├── capas.py        # view_cover (imagem inline), get_cover_url
 │       ├── midia.py        # get_media_assets (MMO)
 │       ├── indice.py       # index_search
 │       └── editora.py      # get_publisher
+├── docs/
+│   └── instalacao-mac.md   # Guia de instalação para macOS
 ├── pyproject.toml          # Build system (hatchling), dependências, entry point
 ├── .env.example            # Referência de variáveis de ambiente
 ├── DEVELOPERS.md           # Este arquivo
-└── README.md               # Guia de instalação para usuários finais
+└── README.md               # Guia de instalação para usuários finais (Windows)
 ```
+
+## Cobertura da API REST v2
+
+Todos os endpoints da especificação (seção 6.1) estão implementados:
+
+| Função | Método | Endpoint | Implementação |
+|---|---|---|---|
+| Login | POST | `/login` | `client._do_login` (token cru ou JSON) |
+| Logout | GET | `/logout` | `client.logout` (no encerramento; libera slot) |
+| Busca (quick/boolean) | GET | `/products` | `metabooks_search_products` |
+| Busca em lote | POST | `/products` | `metabooks_batch_search_isbns` |
+| Índice | GET | `/index/{field}/{term}` | `metabooks_index_search` |
+| Produto | GET | `/product/{id}[/{type}]` | `metabooks_get_product` (json/onix30) |
+| Múltiplos produtos | POST | `/product/multipleProducts` | `metabooks_get_multiple_products` |
+| Editora | GET | `/publisher/{mvbid}` | `metabooks_get_publisher` |
+| Capa (URL) | GET | `/cover/{id}[/{size}]` | `metabooks_get_cover_url` |
+| Capa (imagem) | GET | `/cover/{id}[/{size}]` | `metabooks_view_cover` (JPEG inline) |
+| Mídia/MMO | GET | `/asset/mmo/{productId}` | `metabooks_get_media_assets` |
+
+Notas de design:
+- **Capas** são baixadas via `client.get_bytes` com o token de capa no cabeçalho `Authorization` e devolvidas como imagem — o token nunca é exposto numa URL (seção 5.5.5 / 5.10.1).
+- **Logout** só é disparado para login status-based (usuário/senha); com token estático é no-op.
+- Detalhe de produto suporta `json` (long), `onix30-short` e `onix30-ref`. ONIX 2.1 (legado) não é exposto.
+- Listas (`/products`, `/product/multipleProducts`) são sempre `application/json` (long).
 
 ## Pré-requisitos de desenvolvimento
 
@@ -54,6 +80,15 @@ def register(mcp: FastMCP) -> None:
         """Descrição da ferramenta (aparece no Claude)."""
         client = ctx.request_context.lifespan_context["metabooks"]
         return await client.get("endpoint/path")
+```
+
+Para devolver uma imagem (como em `capas.py`), retorne um `Image` do FastMCP:
+
+```python
+from mcp.server.fastmcp import Image
+# ...
+data = await client.get_bytes("cover/9788530951382/m", scope="cover", accept="image/jpeg")
+return Image(data=data, format="jpeg")
 ```
 
 Depois, registre o novo módulo em `server.py`:

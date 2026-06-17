@@ -29,6 +29,8 @@ async def lifespan(server: FastMCP) -> AsyncIterator[dict]:
     try:
         yield {"metabooks": client}
     finally:
+        # Libera o slot de login paralelo antes de encerrar (no-op para token estático).
+        await client.logout()
         await client.aclose()
 
 
@@ -41,7 +43,7 @@ def main() -> None:
             "Variáveis de ambiente necessárias:\n"
             "  METABOOKS_USERNAME / METABOOKS_PASSWORD  — autenticação em produção\n"
             "  METABOOKS_METADATA_TOKEN                 — token de metadados (staging/rc)\n"
-            "  METABOOKS_COVER_TOKEN                    — token para URLs de capas\n"
+            "  METABOOKS_COVER_TOKEN                    — token para capas\n"
             "  METABOOKS_MMO_TOKEN                      — token para mídias (MMO)\n"
             "  METABOOKS_BASE_URL                       — URL base (opcional, para override)\n\n"
             "Configure em ~/.config/metabooks-mcp/.env ou como variáveis de ambiente."
@@ -64,7 +66,8 @@ def main() -> None:
             "Servidor MCP somente leitura para a API REST v2 da Metabooks. "
             "Módulos disponíveis: busca de produtos no catálogo bibliográfico (busca booleana, "
             "busca em lote por ISBN), detalhe de produto por UUID/ISBN/GTIN (JSON ou ONIX 3.0), "
-            "busca em índice para autocompletar, URLs de mídia/MMO e dados cadastrais de editoras. "
+            "busca em índice para autocompletar, visualização e URL de capas, "
+            "URLs de mídia/MMO e dados cadastrais de editoras. "
             "Credenciais: METABOOKS_USERNAME/METABOOKS_PASSWORD (produção) "
             "ou METABOOKS_METADATA_TOKEN (staging/rc). "
             "Capas e mídias exigem tokens dedicados: METABOOKS_COVER_TOKEN e METABOOKS_MMO_TOKEN."
