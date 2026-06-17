@@ -1,7 +1,15 @@
 """Tools de Capas — endpoint: /cover"""
 
+import os
+import tempfile
 from typing import Annotated, Literal
 from mcp.server.fastmcp import FastMCP, Context, Image
+
+
+def _default_download_dir() -> str:
+    """Pasta padrão para salvar capas: ~/Downloads (se existir) ou pasta temp."""
+    downloads = os.path.join(os.path.expanduser("~"), "Downloads")
+    return downloads if os.path.isdir(downloads) else tempfile.gettempdir()
 
 
 def register(mcp: FastMCP) -> None:
@@ -11,16 +19,66 @@ def register(mcp: FastMCP) -> None:
         ctx: Context,
         id: Annotated[str, "ISBN-13 ou GTIN, NÃO hifenizado (ex.: 9788530951382)"],
         size: Annotated[
-            Literal["s", "m", "l", "original"],
-            "Tamanho: s (90px larg.), m (200px), l (599px alt.) ou original. "
-            "Menor = resposta mais rápida.",
+            Literal["s", "m", "l"],
+            "Tamanho para exibição: s (90px larg.), m (200px) ou l (599px alt.). "
+            "Não há 'original' aqui — para a capa em tamanho original use "
+            "metabooks_download_cover (salva em arquivo).",
         ] = "m",
     ):
-        """Baixa e exibe a imagem de capa de um título por ISBN/GTIN (JPEG inline).
+        """Exibe a capa de um título por ISBN/GTIN inline na conversa (JPEG).
 
-        Autentica com o token dedicado de capa, busca o binário e retorna a
-        imagem para visualização direta na conversa — sem expor o token em
-        nenhuma URL. Exige METABOOKS_COVER_TOKEN.
+        O tamanho é gerenciado pelo MCP para garantir a renderização: só tamanhos
+        leves (s/m/l, no máximo ~44 KB) são servidos inline. A capa 'original'
+        (~1.3 MB) não renderiza inline em alguns clientes (ex.: Claude Desktop) —
+        para ela, use metabooks_download_cover, que salva o arquivo em disco.
+
+        Autentica com o token dedicado de capa, busca o binário e devolve a
+        imagem sem expor o token em nenhuma URL. Exige METABOOKS_COVER_TOKEN.
+        """
+        client = ctx.request_context.lifespan_context["metabooks"]
+        if not client.cover_token:
+            return {
+                "error": (
+                    "Token de capa não configurado. Defina METABOOKS_COVER_TOKEN. "
+                    "Capas exigem token dedicado — login/metadados não as acessa (seção 5.5.5)."
+                )
+            }
+        try:
+            # Accept DEVE ser "*/*": o servidor de capas da Metabooks responde
+            # 406 Not Acceptable a "Accept: image/jpeg" (e 403 a "image/*").
+            # Só "*/*" retorna o binário (image/jpeg) — vale para v1 e v2.
+            data = await client.get_bytes(
+                f"cover/{id}/{size}", scope="cover", accept="*/*"
+            )
+        except Exception as exc:  # noqa: BLE001 — devolve erro amigável ao cliente MCP
+            return {
+                "error": (
+                    f"Não foi possível obter a capa de {id} (tamanho {size}): {exc}. "
+                    "Verifique o ISBN/GTIN, se a capa existe e se o token de capa tem permissão."
+                )
+            }
+        return Image(data=data, format="jpeg")
+
+    @mcp.tool()
+    async def metabooks_download_cover(
+        ctx: Context,
+        id: Annotated[str, "ISBN-13 ou GTIN, NÃO hifenizado (ex.: 9788530951382)"],
+        size: Annotated[
+            Literal["s", "m", "l", "original"],
+            "Tamanho a baixar. 'original' = pixels originais (web-optimized), "
+            "padrão para download; s/m/l reduzem proporcionalmente.",
+        ] = "original",
+        dest: Annotated[
+            str | None,
+            "Destino opcional: caminho de um arquivo .jpg OU uma pasta (o nome do "
+            "arquivo é gerado). Se omitido, salva em ~/Downloads (ou pasta temporária).",
+        ] = None,
+    ) -> dict:
+        """Baixa a capa e salva em arquivo no disco; retorna o caminho.
+
+        Use para obter a capa em tamanho 'original' (~1.3 MB), que não renderiza
+        inline. Para apenas visualizar na conversa, use metabooks_view_cover.
+        Exige METABOOKS_COVER_TOKEN.
         """
         client = ctx.request_context.lifespan_context["metabooks"]
         if not client.cover_token:
@@ -32,20 +90,52 @@ def register(mcp: FastMCP) -> None:
             }
         size_segment = f"/{size}" if size != "original" else ""
         try:
-            # Accept DEVE ser "*/*": o servidor de capas da Metabooks responde
-            # 406 Not Acceptable a "Accept: image/jpeg" (e 403 a "image/*").
-            # Só "*/*" retorna o binário (image/jpeg) — vale para v1 e v2.
             data = await client.get_bytes(
                 f"cover/{id}{size_segment}", scope="cover", accept="*/*"
             )
         except Exception as exc:  # noqa: BLE001 — devolve erro amigável ao cliente MCP
             return {
                 "error": (
-                    f"Não foi possível obter a capa de {id} (tamanho {size}): {exc}. "
+                    f"Não foi possível baixar a capa de {id} (tamanho {size}): {exc}. "
                     "Verifique o ISBN/GTIN, se a capa existe e se o token de capa tem permissão."
                 )
             }
-        return Image(data=data, format="jpeg")
+        if not data.startswith(b"\xff\xd8\xff"):
+            return {
+                "error": (
+                    f"O servidor não devolveu um JPEG válido para {id} (tamanho {size}). "
+                    f"Primeiros bytes: {data[:16]!r}."
+                )
+            }
+
+        filename = f"capa_{id}_{size}.jpg"
+        if dest is None:
+            target = os.path.join(_default_download_dir(), filename)
+        else:
+            dest = os.path.expanduser(dest)
+            # Pasta (existente ou terminada em separador) → anexa o nome gerado;
+            # caminho com extensão → usa como arquivo; senão, trata como pasta.
+            if os.path.isdir(dest) or dest.endswith(("/", "\\")):
+                target = os.path.join(dest, filename)
+            elif os.path.splitext(dest)[1]:
+                target = dest
+            else:
+                target = os.path.join(dest, filename)
+        target = os.path.abspath(target)
+        try:
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with open(target, "wb") as fh:
+                fh.write(data)
+        except OSError as exc:
+            return {"error": f"Falha ao salvar a capa em {target}: {exc}"}
+
+        return {
+            "id": id,
+            "size": size,
+            "path": target,
+            "bytes": len(data),
+            "message": f"Capa salva em {target} ({len(data) / 1024:.1f} KB).",
+        }
 
     @mcp.tool()
     async def metabooks_get_cover_url(

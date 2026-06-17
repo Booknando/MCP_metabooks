@@ -191,7 +191,8 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 | Busca em lote de ISBNs | Consulta até 500 ISBNs de uma vez |
 | Detalhes de um livro | Retorna todos os metadados de um título (JSON ou ONIX 3.0) |
 | Detalhes de vários livros | Consulta vários UUIDs ao mesmo tempo |
-| Visualizar capa | Exibe a imagem da capa direto na conversa (exige token de capa) |
+| Visualizar capa | Exibe a imagem da capa direto na conversa, em tamanho leve (exige token de capa) |
+| Baixar capa | Salva a capa em arquivo no disco — use para o tamanho original (exige token de capa) |
 | URL da capa | Retorna o link direto para a imagem da capa |
 | Arquivos de mídia | Lista URLs de capa, sumário, amostras e foto do autor |
 | Autocomplete | Sugere autores, editoras, títulos e palavras-chave |
@@ -229,6 +230,8 @@ As ferramentas de **capa** e **mídia/MMO** precisam de tokens separados. Se a M
 ```
 
 Com o token de capa configurado, peça por exemplo *"mostre a capa do ISBN 9788530951382"* e o Claude exibe a imagem direto na conversa (a capa é baixada e devolvida como imagem — o token nunca aparece numa URL).
+
+Para exibição, o tamanho é gerenciado automaticamente (versões leves, que sempre renderizam inline). A capa em **tamanho original** (~1,3 MB) não aparece bem inline em alguns clientes — para ela, peça *"baixe a capa original do ISBN 9788530951382"* e o Claude salva o arquivo em disco (por padrão na pasta `Downloads`).
 
 ---
 

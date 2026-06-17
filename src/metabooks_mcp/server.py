@@ -66,7 +66,7 @@ def main() -> None:
             "Servidor MCP somente leitura para a API REST v2 da Metabooks. "
             "Módulos disponíveis: busca de produtos no catálogo bibliográfico (busca booleana, "
             "busca em lote por ISBN), detalhe de produto por UUID/ISBN/GTIN (JSON ou ONIX 3.0), "
-            "busca em índice para autocompletar, visualização e URL de capas, "
+            "busca em índice para autocompletar, visualização/download/URL de capas, "
             "URLs de mídia/MMO e dados cadastrais de editoras. "
             "Credenciais: METABOOKS_USERNAME/METABOOKS_PASSWORD (produção) "
             "ou METABOOKS_METADATA_TOKEN (staging/rc). "
