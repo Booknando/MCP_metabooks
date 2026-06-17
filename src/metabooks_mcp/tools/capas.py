@@ -32,8 +32,11 @@ def register(mcp: FastMCP) -> None:
             }
         size_segment = f"/{size}" if size != "original" else ""
         try:
+            # Accept DEVE ser "*/*": o servidor de capas da Metabooks responde
+            # 406 Not Acceptable a "Accept: image/jpeg" (e 403 a "image/*").
+            # Só "*/*" retorna o binário (image/jpeg) — vale para v1 e v2.
             data = await client.get_bytes(
-                f"cover/{id}{size_segment}", scope="cover", accept="image/jpeg"
+                f"cover/{id}{size_segment}", scope="cover", accept="*/*"
             )
         except Exception as exc:  # noqa: BLE001 — devolve erro amigável ao cliente MCP
             return {
@@ -68,4 +71,5 @@ def register(mcp: FastMCP) -> None:
             "size": size,
             "cover_url": cover_url,
             "auth": "Requer token de capa (Authorization: Bearer ... ou ?access_token=...).",
+            "accept": "Envie 'Accept: */*' — o servidor responde 406 a 'image/jpeg' e 403 a 'image/*'.",
         }
