@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Capa Metabooks</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    #cover {
+      max-width: 100%;
+      max-height: 70vh;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+      display: none;
+    }
+    #status {
+      font-size: 14px;
+      opacity: 0.7;
+      text-align: center;
+      padding: 24px 8px;
+    }
+    #caption {
+      font-size: 13px;
+      opacity: 0.75;
+      text-align: center;
+      max-width: 90%;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="status">Carregando capa…</div>
+  <img id="cover" alt="Capa do livro" />
+  <div id="caption"></div>
+
+  <script>
+    // App MCP (extensão io.modelcontextprotocol/ui) — implementação mínima e sem
+    // dependências da ponte postMessage. Experimental: o host empurra o resultado
+    // da tool via a notificação `ui/notifications/tool-result`, de onde extraímos
+    // o bloco de imagem (base64) e exibimos em destaque.
+    (function () {
+      "use strict";
+      var HOST = window.parent;
+      var statusEl = document.getElementById("status");
+      var imgEl = document.getElementById("cover");
+      var captionEl = document.getElementById("caption");
+
+      function send(msg) {
+        try { HOST.postMessage(msg, "*"); } catch (e) { /* noop */ }
+      }
+
+      function showImage(dataUri, alt) {
+        imgEl.src = dataUri;
+        if (alt) imgEl.alt = alt;
+        imgEl.style.display = "block";
+        statusEl.style.display = "none";
+      }
+
+      function showText(text) {
+        captionEl.textContent = text;
+        captionEl.style.display = "block";
+      }
+
+      function renderToolResult(params) {
+        if (!params) return;
+        var content = params.content || [];
+        var image = null;
+        var texts = [];
+        for (var i = 0; i < content.length; i++) {
+          var c = content[i];
+          if (c && c.type === "image" && c.data && !image) image = c;
+          else if (c && c.type === "text" && c.text) texts.push(c.text);
+        }
+        if (image) {
+          var mime = image.mimeType || "image/jpeg";
+          showImage("data:" + mime + ";base64," + image.data);
+        } else if (texts.length) {
+          // Sem imagem: provavelmente um erro/dica devolvido como texto.
+          statusEl.style.display = "none";
+          showText(texts.join("\n"));
+        }
+      }
+
+      window.addEventListener("message", function (event) {
+        var msg = event.data;
+        if (!msg || msg.jsonrpc !== "2.0") return;
+
+        // Resposta ao nosso ui/initialize → confirmar com a notificação initialized.
+        if (msg.id === 1 && msg.result) {
+          send({ jsonrpc: "2.0", method: "ui/notifications/initialized", params: {} });
+          return;
+        }
+        if (msg.method === "ui/notifications/tool-result") {
+          renderToolResult(msg.params);
+        }
+      });
+
+      // O iframe inicia o handshake.
+      send({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "ui/initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          clientInfo: { name: "metabooks-cover", version: "1.0.0" },
+          appCapabilities: {}
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

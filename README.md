@@ -183,6 +183,32 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 
 ---
 
+## Exibição da capa e quedas da VM (perguntas frequentes)
+
+**"A capa aparece dentro do cartão recolhido *Usou uma ferramenta*, não direto na conversa"**
+
+Isso é comportamento do **cliente** (Claude Desktop e Cowork), não do MCP. Imagens devolvidas por uma ferramenta MCP são sempre renderizadas **dentro do cartão de resultado da ferramenta**, que vem recolhido — basta clicar para expandir. A capa está correta e completa; o Claude apenas não consegue "reemitir" a imagem na própria bolha de resposta (só descrevê-la). Não há configuração no servidor que mude **onde** o cliente coloca a imagem.
+
+> Há um modo **experimental** (app HTML via MCP Apps) que tenta exibir a capa em destaque. Está desligado por padrão — veja `METABOOKS_ENABLE_UI_APP` em [DEVELOPERS.md](DEVELOPERS.md).
+
+**"O espaço de trabalho do Claude cai: *VM service not running. The service failed to start*"**
+
+Essa é a **VM do Cowork** (o ambiente que executa código e arquivos dentro do Claude Desktop) — um serviço **separado** do MCP metabooks. O servidor metabooks roda como um processo local comum e **não usa essa VM**, então não é a causa da queda. Para destravar:
+
+1. Reinicie o Claude Desktop; se persistir, reinicie o Windows.
+2. Atualize o Claude Desktop para a versão mais recente.
+3. Verifique a virtualização do Windows: habilite **Plataforma de Máquina Virtual** e **Hyper-V**, atualize o WSL2 (`wsl --update`) e confirme que a virtualização está ligada na BIOS.
+4. Verifique se antivírus/firewall corporativo está bloqueando o serviço de VM.
+5. Se o aviso oferecer o link **"reinstalar o workspace"**, use-o.
+
+Para confirmar a recuperação, veja `%APPDATA%\Roaming\Claude\logs\cowork_vm_node.log` (a linha de sucesso é `[VM:start] Windows VM service configured`).
+
+**"Como sei qual cópia do MCP o Claude está usando?"**
+
+Abra `%APPDATA%\Roaming\Claude\logs\mcp-server-metabooks.log` e procure a linha `Using MCP server command:` — ela mostra o caminho do executável realmente iniciado. Se você instalou o `metabooks-mcp` em mais de um ambiente Python, podem existir cópias diferentes; garanta que o `claude_desktop_config.json` aponta para a correta. (Observação: a versão mostrada no handshake é a do SDK MCP, não a do projeto.)
+
+---
+
 ## O que o Metabooks MCP consegue fazer
 
 | Ferramenta | O que faz |

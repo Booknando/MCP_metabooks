@@ -1,15 +1,36 @@
 """Tools de Capas — endpoint: /cover"""
 
 import os
+from pathlib import Path
 from typing import Annotated, Literal
 from mcp.server.fastmcp import FastMCP, Context, Image
 
 from ._files import resolve_target
 
+# --- MCP Apps (extensão io.modelcontextprotocol/ui) — EXPERIMENTAL --------------
+# Quando METABOOKS_ENABLE_UI_APP está ligado, a tool view_cover passa a referenciar
+# um recurso ui:// (app HTML) que tenta exibir a capa em destaque no host, em vez de
+# só dentro do cartão recolhido da ferramenta. Desligado por padrão: o retorno
+# `Image` continua sendo o caminho universal e o fallback.
+COVER_UI_URI = "ui://metabooks/cover"
+_COVER_APP_HTML = Path(__file__).resolve().parent.parent / "ui" / "cover_app.html"
+
+
+def _ui_app_enabled() -> bool:
+    return os.environ.get("METABOOKS_ENABLE_UI_APP", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
 
 def register(mcp: FastMCP) -> None:
 
-    @mcp.tool()
+    ui_app = _ui_app_enabled()
+    cover_meta = {"ui": {"resourceUri": COVER_UI_URI}} if ui_app else None
+
+    @mcp.tool(meta=cover_meta)
     async def metabooks_view_cover(
         ctx: Context,
         id: Annotated[str, "ISBN-13 ou GTIN, NÃO hifenizado (ex.: 9788530951382)"],
@@ -149,3 +170,15 @@ def register(mcp: FastMCP) -> None:
             "browser_openable": False,
             "display_hint": "Para exibir na conversa use metabooks_view_cover (NÃO cole esta URL como imagem).",
         }
+
+    # Recurso ui:// só é exposto quando o modo experimental está ligado.
+    if ui_app:
+
+        @mcp.resource(
+            COVER_UI_URI,
+            name="cover-app",
+            mime_type="text/html;profile=mcp-app",
+        )
+        def cover_app_resource() -> str:
+            """App HTML (MCP Apps) que exibe a capa em destaque (experimental)."""
+            return _COVER_APP_HTML.read_text(encoding="utf-8")

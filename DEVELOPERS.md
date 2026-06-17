@@ -9,12 +9,14 @@ metabooks-mcp/
 ├── src/metabooks_mcp/
 │   ├── server.py           # FastMCP: lifespan (login/logout), registro de módulos, entry point
 │   ├── client.py           # MetabooksClient: HTTP, autenticação, cache de token, logout, get_bytes
-│   └── tools/
-│       ├── produtos.py     # search_products, batch_search_isbns, get_product, get_multiple_products
-│       ├── capas.py        # view_cover (imagem inline), get_cover_url
-│       ├── midia.py        # get_media_assets (MMO)
-│       ├── indice.py       # index_search
-│       └── editora.py      # get_publisher
+│   ├── tools/
+│   │   ├── produtos.py     # search_products, batch_search_isbns, get_product, get_multiple_products
+│   │   ├── capas.py        # view_cover / download_cover / get_cover_url (+ recurso ui:// experimental)
+│   │   ├── midia.py        # get_media_assets / view_media_asset / download_media_asset (MMO)
+│   │   ├── indice.py       # index_search
+│   │   └── editora.py      # get_publisher
+│   └── ui/
+│       └── cover_app.html  # App HTML (MCP Apps) p/ exibir a capa em destaque (experimental)
 ├── docs/
 │   └── instalacao-mac.md   # Guia de instalação para macOS
 ├── pyproject.toml          # Build system (hatchling), dependências, entry point
@@ -49,6 +51,40 @@ Notas de design:
 - **Logout** só é disparado para login status-based (usuário/senha); com token estático é no-op.
 - Detalhe de produto suporta `json` (long), `onix30-short` e `onix30-ref`. ONIX 2.1 (legado) não é exposto.
 - Listas (`/products`, `/product/multipleProducts`) são sempre `application/json` (long).
+
+## Diagnóstico: o que é do cliente e o que é do MCP
+
+- **A capa aparece dentro do cartão recolhido "Usou uma ferramenta".** É renderização do
+  **cliente** (Claude Desktop/Cowork): imagens devolvidas por uma tool MCP (bloco `ImageContent`)
+  são sempre mostradas dentro do cartão de resultado, recolhido por padrão. O modelo recebe a
+  imagem como entrada mas não pode reemiti-la na própria bolha. **Não há API no MCP** para mudar
+  esse posicionamento — só o host decide. Mitigação experimental: MCP Apps (abaixo).
+- **"VM service not running. The service failed to start"** é falha da **VM do Cowork** (serviço
+  de VM Windows embutido do Claude Desktop), **não** do MCP. O servidor roda como subprocesso
+  stdio no host e nem toca nessa VM. Evidência: `cowork_vm_node.log` →
+  `[VM:start] Startup failed`, enquanto `mcp-server-metabooks.log` mostra o MCP saudável
+  (`isError:false`, login `200 OK`). Passos de mitigação ficam no README (FAQ).
+- **`serverInfo.version` no handshake é a versão do SDK MCP, não a do projeto.** Como
+  `FastMCP(...)` em `server.py` não recebe `version=`, o handshake reporta a versão do pacote
+  `mcp` (ex.: `1.27.2`) — isso **não** indica build velho. Para saber o build real, veja a linha
+  `Using MCP server command:` em `mcp-server-metabooks.log` (caminho do executável iniciado).
+
+## Exibição da capa via MCP Apps (experimental)
+
+Extensão `io.modelcontextprotocol/ui` (MCP Apps). Desligada por padrão; ligue com
+`METABOOKS_ENABLE_UI_APP=1` no bloco `env`. Quando ligada (ver `tools/capas.py`):
+
+- `metabooks_view_cover` ganha `_meta = {"ui": {"resourceUri": "ui://metabooks/cover"}}`.
+- Registra-se o recurso `ui://metabooks/cover` (mimeType `text/html;profile=mcp-app`) servindo
+  `src/metabooks_mcp/ui/cover_app.html`.
+- `cover_app.html` implementa, sem dependências, a ponte postMessage (`ui/initialize` →
+  `ui/notifications/initialized`; recebe `ui/notifications/tool-result` e renderiza o bloco de
+  imagem em `<img>`).
+
+O retorno `Image` permanece intacto e é o **fallback** universal: clientes sem MCP Apps seguem
+mostrando a capa no cartão. **Resultado incerto** — o host ainda pode renderizar o app como
+widget associado à ferramenta. Validar no Claude Desktop; se não melhorar a proeminência, basta
+manter a flag desligada (ou remover a UI).
 
 ## Pré-requisitos de desenvolvimento
 
@@ -140,6 +176,7 @@ No `claude_desktop_config.json`, aponte para o módulo Python diretamente:
 | `METABOOKS_COVER_TOKEN` | Token de capas (opcional, exige contrato com MVB) |
 | `METABOOKS_MMO_TOKEN` | Token de mídia/MMO (opcional, exige contrato com MVB) |
 | `METABOOKS_BASE_URL` | URL base da API (padrão: `https://api.metabooks.com/api/v2`) |
+| `METABOOKS_ENABLE_UI_APP` | (Experimental) `1`/`true` liga o app HTML (MCP Apps) da capa via recurso `ui://` |
 
 ## Tecnologias
 
