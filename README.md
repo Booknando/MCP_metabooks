@@ -236,7 +236,7 @@ Abra `%APPDATA%\Roaming\Claude\logs\mcp-server-metabooks.log` e procure a linha 
 |---|---|
 | Buscar por palavras-chave | Encontra livros por título, autor, editora, ISBN e outros filtros |
 | Busca em lote de ISBNs | Consulta até 500 ISBNs de uma vez |
-| Detalhes de um livro | Retorna todos os metadados de um título (JSON ou ONIX 3.0) |
+| Detalhes de um livro | Retorna os metadados de um título — resumido (padrão) ou completo (JSON ou ONIX 3.0) |
 | Detalhes de vários livros | Consulta vários UUIDs ao mesmo tempo |
 | Visualizar capa | Exibe a imagem da capa direto na conversa, em tamanho leve (exige token de capa) |
 | Baixar capa | Salva a capa em arquivo no disco — use para o tamanho original (exige token de capa) |
@@ -266,6 +266,16 @@ Você pode pedir ao Claude em linguagem natural. Se quiser usar a sintaxe avanç
 | Por data de atualização | `AD=20240101^20241231` |
 
 Combine com `and`, `or`, `not` e parênteses. Exemplo: `VL=Novatec and PF=E*` (e-books da Novatec).
+
+### Respostas resumidas por padrão
+
+Para o Claude não se perder em respostas muito longas — e às vezes escolher o livro
+errado —, a busca vem **resumida** por padrão: só os dados que identificam cada
+título (título, autor, ISBN, editora, data, formato e disponibilidade), além do
+total de resultados encontrados. Quando dois títulos parecem iguais, o Claude
+sinaliza e pede confirmação em vez de adivinhar. Se precisar de tudo, peça o
+detalhe completo de um título específico (por exemplo: "me traga todos os
+metadados deste ISBN").
 
 ---
 
