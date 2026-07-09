@@ -50,7 +50,39 @@ Notas de design:
 - **Mídias/MMO**: `get_media_assets` **não devolve a URL crua** (auth-gated, não abre no navegador) — expõe um `asset_id` estável. `view_media_asset` e `download_media_asset` resolvem o `asset_id` para a URL do listing e buscam o binário via `client.get_bytes_from_url` (guarda de host anti-SSRF). A capa frontal listada aponta para o endpoint `/cover` (token de capa); os demais arquivos usam o token de MMO — o scope é decidido pela URL. Imagens exibidas inline são reduzidas com Pillow (lado maior ≤ 1024 px) para garantir o render.
 - **Logout** só é disparado para login status-based (usuário/senha); com token estático é no-op.
 - Detalhe de produto suporta `json` (long), `onix30-short` e `onix30-ref`. ONIX 2.1 (legado) não é exposto.
-- Listas (`/products`, `/product/multipleProducts`) são sempre `application/json` (long).
+- Buscas e listas usam o formato compacto por padrão (ver seção abaixo).
+
+## Formato compacto (anti-alucinação)
+
+Modelos pequenos (ex.: Haiku) erram quando o JSON é grande — sobretudo em busca,
+onde a sinopse de livros-ruído contém as palavras pesquisadas e faz o modelo
+escolher o título errado (caso "O Andar do Bêbado"). Por isso as tools de produto
+têm um parâmetro `view`:
+
+- `view="compact"` (**padrão**): resposta enxuta, própria para o modelo raciocinar.
+- `view="full"`: JSON completo e cru da API (comportamento antigo).
+
+Dois níveis, complementares (`tools/produtos.py` + `tools/_compact.py`):
+
+1. **`application/json-short` nativo da API.** `client.get`/`client.post` aceitam o
+   parâmetro `accept`; as buscas/listas pedem `application/json-short` (formato
+   compacto da própria Metabooks — ver a collection Postman). O corpo do POST
+   segue como `application/json`; só o `Accept` muda o formato de saída.
+2. **Projeção própria** (`_compact.py`) por cima: só campos de identificação, com
+   **chaves em português** (que servem de rótulos amigáveis), **sem sinopse**,
+   com `total` de resultados, flag `titulo_exato` e `aviso` de ambiguidade. O
+   detalhe (`compact_detail`) trunca textos longos em vez de despejar todos os
+   blocos ONIX.
+
+A extração é **tolerante a schema**: cada campo é buscado por chaves candidatas
+(constantes `CANDIDATES*` no topo de `_compact.py`); se reconhecer pouco, uma
+rede de segurança (`_shrink`) devolve o registro cru **reduzido** — nunca vazio.
+
+> ⚠️ Os nomes de campo em `CANDIDATES*` foram definidos a partir da estrutura
+> ONIX/Metabooks esperada, **sem uma amostra real da API** (o host estava
+> bloqueado no ambiente de desenvolvimento). Ao rodar contra a API real, confira
+> uma resposta de `application/json-short` e ajuste `CANDIDATES*` se algum campo
+> não aparecer no compacto (o fallback garante que nada se perca enquanto isso).
 
 ## Diagnóstico: o que é do cliente e o que é do MCP
 

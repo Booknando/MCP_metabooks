@@ -150,7 +150,8 @@ class MetabooksClient:
                 response.raise_for_status()
             else:
                 raise
-        return response.json() if accept == "application/json" else response.text
+        # json e json-short são ambos JSON; ONIX (onix30-*) volta como texto/XML.
+        return response.json() if accept.startswith("application/json") else response.text
 
     async def get_bytes(
         self,
@@ -205,13 +206,20 @@ class MetabooksClient:
         scope: Scope = "metadata",
         json: Any = None,
         params: dict | None = None,
+        accept: str = "application/json",
     ) -> Any:
-        """POST autenticado com corpo JSON."""
+        """POST autenticado com corpo JSON.
+
+        ``accept`` controla o formato da resposta: ``application/json`` (long,
+        padrão) ou ``application/json-short`` (representação compacta nativa da
+        API, bem menor). O corpo enviado é sempre JSON normal — só o cabeçalho
+        Accept muda o formato de saída.
+        """
         token = await self._token_for(scope)
         url = f"{self.base_url}/{path.lstrip('/')}"
         headers = {
             "Authorization": f"Bearer {token}",
-            "Accept": "application/json",
+            "Accept": accept,
             "Content-Type": "application/json",
         }
         response = await self._http.post(url, headers=headers, json=json, params=params)
