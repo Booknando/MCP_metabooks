@@ -75,14 +75,32 @@ Dois níveis, complementares (`tools/produtos.py` + `tools/_compact.py`):
    blocos ONIX.
 
 A extração é **tolerante a schema**: cada campo é buscado por chaves candidatas
-(constantes `CANDIDATES*` no topo de `_compact.py`); se reconhecer pouco, uma
-rede de segurança (`_shrink`) devolve o registro cru **reduzido** — nunca vazio.
+(constantes `CANDIDATES*`/`*_CANDS` e extratores `_extract_*` no topo de
+`_compact.py`); se reconhecer pouco, uma rede de segurança (`_shrink`) devolve o
+registro cru **reduzido** — nunca vazio.
 
-> ⚠️ Os nomes de campo em `CANDIDATES*` foram definidos a partir da estrutura
-> ONIX/Metabooks esperada, **sem uma amostra real da API** (o host estava
-> bloqueado no ambiente de desenvolvimento). Ao rodar contra a API real, confira
-> uma resposta de `application/json-short` e ajuste `CANDIDATES*` se algum campo
-> não aparecer no compacto (o fallback garante que nada se perca enquanto isso).
+Os candidatos foram **conferidos contra respostas reais da API (v2.5.0, 2026-07)**,
+que expõe TRÊS formas distintas, todas cobertas:
+
+1. **Busca/lista "long"** (`GET /products`, `Accept: application/json`) — campos
+   planos: `id`, `isbn`, `title`, `subTitle`, `publisher`, `publicationDate`,
+   `productFormId`/`productType`, `priceBrl`, `author`/`contributors[].fullName`,
+   `state`, `language`.
+2. **json-short** (`Accept: application/json-short`) — subconjunto enxuto com os
+   MESMOS nomes planos da forma 1.
+3. **Detalhe "long"** (`GET /product/{id}`) — estilo ONIX aninhado:
+   `titles[].title`, `identifiers[].idValue` (por `productIdentifierType` 15/03),
+   `contributors[].firstName/lastName` + `contributorRole`, `prices[].priceAmount`
+   + `currencyCode`, `form.productForm`, `extent.mainContentPageCount`,
+   `languages[].languageCode`, `publishers[].publisherName`, `productAvailability`,
+   `active`.
+
+Códigos são traduzidos para PT quando **verificáveis** (ISO 639, listas ONIX
+5/17/150, campo `state`). Os códigos numéricos de disponibilidade
+(`availabilityStatePublisher`/`productAvailability`) **não** são mapeados — seu
+significado não é confiável aqui (um título `archived` vem com código `40`), então
+a disponibilidade legível usa `state`/`active`, e o código cru fica só no detalhe
+reduzido.
 
 ## Diagnóstico: o que é do cliente e o que é do MCP
 

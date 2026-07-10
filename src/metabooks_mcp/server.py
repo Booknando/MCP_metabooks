@@ -73,6 +73,7 @@ def main() -> None:
             "(view='compact', padrão — lista enxuta sem sinopse); só então busque o detalhe "
             "com metabooks_get_product usando o UUID/ISBN retornado. Não peça 'full' sem "
             "necessidade. "
+            "SINTAXE DE BUSCA (metabooks_search_products): " + produtos.SEARCH_SYNTAX + " "
             "DESAMBIGUAÇÃO: a busca compacta marca 'titulo_exato' e pode incluir um 'aviso'. "
             "Diante de vários resultados, título parcial ou autor homônimo, APRESENTE os "
             "candidatos e PEÇA CONFIRMAÇÃO ao usuário — nunca escolha um resultado por conta "

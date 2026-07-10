@@ -263,9 +263,11 @@ Você pode pedir ao Claude em linguagem natural. Se quiser usar a sintaxe avanç
 | Somente e-books | `PF=E*` |
 | Por palavra-chave | `SW=programação` |
 | Por faixa de preço | `PR=40^80` |
+| Por ano de publicação | `EJ=2020` |
 | Por data de atualização | `AD=20240101^20241231` |
+| Por ID de série | `RH=AAABX01` |
 
-Combine com `and`, `or`, `not` e parênteses. Exemplo: `VL=Novatec and PF=E*` (e-books da Novatec).
+Combine com `and`, `or`, `not` e parênteses. Exemplos: `VL=Novatec and PF=E*` (e-books da Novatec), `ST=Linux and PF=not EA` (Linux, exceto digital).
 
 ### Respostas resumidas por padrão
 

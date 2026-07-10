@@ -14,12 +14,14 @@ sempre expõe o **total** de resultados (evita truncamento silencioso — PS-03)
 
 Robustez
 --------
-Como o schema exato da API não está documentado no repositório, a extração é
-**tolerante**: cada campo é buscado por uma lista de chaves candidatas (inclusive
-aninhadas, à moda ONIX). Se a extração ficar pobre demais, uma rede de segurança
-(`_shrink`) devolve o registro cru **reduzido** (strings truncadas, listas
-limitadas) — nunca vazio. As listas de chaves candidatas ficam concentradas em
-CANDIDATES_* logo abaixo, para ajuste rápido quando houver uma amostra real.
+Os campos foram conferidos contra respostas REAIS da API (2026-07), que expõe três
+formas distintas — busca/lista "long", `json-short` (mesmos nomes planos) e detalhe
+"long" estilo ONIX aninhado. A extração é **tolerante**: cada campo é buscado por
+uma lista de chaves candidatas (inclusive aninhadas) ou por um extrator dedicado
+(`_extract_*`) quando exige lógica (chave-irmã, array, código→texto). Se a extração
+ficar pobre demais, uma rede de segurança (`_shrink`) devolve o registro cru
+**reduzido** (strings truncadas, listas limitadas) — nunca vazio. As listas de
+candidatas e os mapas código→texto ficam concentrados logo abaixo.
 """
 
 from __future__ import annotations
@@ -27,28 +29,61 @@ from __future__ import annotations
 import unicodedata
 from typing import Any
 
-# --- Chaves candidatas (AJUSTAR/CONFIRMAR contra amostra real da API) ----------
+# --- Chaves candidatas (conferidas contra respostas reais da API) --------------
 # Ordem = prioridade. A busca é case-insensitive e também procura em sub-objetos
-# comuns (ver _deep_get). ONIX-like usa arrays aninhados, tratados caso a caso.
+# comuns (ver _deep_get). A API expõe TRÊS formas distintas, todas cobertas aqui:
+#   1) busca/lista "long" e json-short — campos planos: id, isbn, title, subTitle,
+#      publisher, publicationDate, productFormId, productType, priceBrl, author,
+#      state, availabilityStatePublisher, language.
+#   2) detalhe "long" (/product/{id}) — estilo ONIX aninhado: titles[].title,
+#      identifiers[].idValue, contributors[].firstName/lastName, prices[].priceAmount,
+#      form.productForm, extent.mainContentPageCount, languages[].languageCode,
+#      publishers[].publisherName, productAvailability, active.
+# Campos que exigem lógica (código→texto, chave-irmã, array) têm extrator próprio
+# abaixo (_extract_*); estes CANDIDATES cobrem só os campos de passagem direta.
 CANDIDATES = {
     "uuid": ["id", "productId", "uuid", "productUuid"],
-    "isbn": ["isbn13", "isbn", "gtin13", "gtin", "ean", "identifier"],
     "titulo": ["title", "titleText", "mainTitle", "distinctiveTitle"],
-    "subtitulo": ["subtitle", "subTitle"],
-    "editora": ["publisherName", "publisher", "imprintName", "imprint"],
+    "subtitulo": ["subTitle", "subtitle"],
+    "editora": ["publisher", "publisherName", "imprintName", "imprint"],
     "data_publicacao": [
         "publicationDate", "publishingDate", "publishedDate", "pubDate",
     ],
-    "formato": [
-        "productFormText", "productForm", "productFormDetail", "format",
-        "editionFormat",
-    ],
-    "disponibilidade": [
-        "productAvailabilityText", "productAvailability", "availabilityText",
-        "availability", "availabilityStatus", "availabilityCode",
-    ],
-    "idioma": ["language", "languageCode", "originalLanguage"],
-    "paginas": ["numberOfPages", "pageCount", "pages", "extentValue"],
+}
+
+# Listas de candidatos usadas pelos extratores dedicados.
+ISBN_FLAT_CANDS = ["isbn13", "isbn", "gtin13"]
+ISBN_FALLBACK_CANDS = ["gtin", "ean", "identifier"]
+LANG_CANDS = ["language", "languageCode", "originalLanguage"]
+FORM_CODE_CANDS = ["productFormId", "productForm", "productFormText", "productFormDetail", "format"]
+PAGES_CANDS = ["mainContentPageCount", "numberOfPagesMain", "numberOfPages", "pageCount", "pages"]
+
+# Mapas código→texto PT. Só entram códigos VERIFICÁVEIS (ISO 639, listas ONIX
+# 5/17/150 e o campo 'state' da própria API). Códigos numéricos de disponibilidade
+# (availabilityStatePublisher/productAvailability) NÃO são mapeados: seu significado
+# não é confiável aqui (ex.: um título 'archived' vem com código '40'), então
+# preferimos o campo 'state'/'active' e nunca inventamos um rótulo.
+LANG_MAP = {
+    "por": "Português", "eng": "Inglês", "spa": "Espanhol", "esp": "Espanhol",
+    "fre": "Francês", "fra": "Francês", "ger": "Alemão", "deu": "Alemão",
+    "ita": "Italiano", "lat": "Latim", "jpn": "Japonês", "mul": "Multilíngue",
+}
+PRODUCT_TYPE_MAP = {
+    "ebook": "E-book", "pbook": "Livro impresso", "audiobook": "Audiolivro",
+}
+PRODUCT_FORM_MAP = {  # ONIX lista 150 (subconjunto comum)
+    "BC": "Livro (brochura)", "BB": "Livro (capa dura)", "BA": "Livro",
+    "DG": "E-book", "EA": "Digital (download)", "ED": "Digital (online)",
+    "AC": "Audiolivro (CD)", "AJ": "Audiolivro (download)",
+}
+STATE_MAP = {
+    "active": "ativo", "archived": "arquivado", "inactive": "inativo",
+    "deleted": "removido", "new": "novo",
+}
+CONTRIB_ROLE_MAP = {  # ONIX lista 17 (subconjunto comum)
+    "A01": "Autor", "A08": "Fotógrafo", "A12": "Ilustrador", "A15": "Prefácio",
+    "A24": "Introdução", "B01": "Editor/organizador", "B06": "Tradutor",
+    "B25": "Arranjo", "E07": "Narrador",
 }
 
 # Blocos de texto longo (sinopse/marketing) — nunca entram na busca compacta e
@@ -123,37 +158,89 @@ def _deep_get(obj: Any, candidates: list[str], _depth: int = 0) -> Any:
     return None
 
 
-def _extract_authors(p: dict) -> list[str] | None:
-    """Extrai autores/contribuidores como 'Nome (papel)' de forma tolerante."""
-    for key in ("contributors", "contributor", "authors", "author", "creators"):
-        arr = None
-        for k in p.keys():
+def _get_ci(obj: Any, key: str) -> Any:
+    """Valor de uma chave (case-insensitive) só no nível atual do dict."""
+    if isinstance(obj, dict):
+        for k in obj:
             if k.lower() == key.lower():
-                arr = p[k]
-                break
+                return obj[k]
+    return None
+
+
+def _extract_isbn(p: dict) -> str | None:
+    """ISBN-13/GTIN-13, tolerante às três formas da API.
+
+    Planos (busca/json-short): isbn/isbn13/gtin13. Detalhe ONIX:
+    identifiers[].idValue filtrado por productIdentifierType (15=ISBN-13,
+    03=GTIN-13, 02=ISBN-10) — sem esse filtro, _deep_get pegaria qualquer idValue.
+    """
+    flat = _deep_get(p, ISBN_FLAT_CANDS)
+    if flat and str(flat).strip():
+        return str(flat).strip()
+    for key in ("identifiers", "productIdentifiers"):
+        arr = _get_ci(p, key)
+        if isinstance(arr, list):
+            by_type: dict[str, str] = {}
+            for it in arr:
+                if isinstance(it, dict):
+                    t = str(_get_ci(it, "productIdentifierType")
+                            or _get_ci(it, "idType") or "").strip()
+                    val = _get_ci(it, "idValue") or _get_ci(it, "value")
+                    if t and val:
+                        by_type.setdefault(t, str(val).strip())
+            for t in ("15", "03", "02"):
+                if by_type.get(t):
+                    return by_type[t]
+    fallback = _deep_get(p, ISBN_FALLBACK_CANDS)
+    return str(fallback).strip() if fallback and str(fallback).strip() else None
+
+
+def _extract_authors(p: dict) -> list[str] | None:
+    """Extrai autores/contribuidores como 'Nome (papel)' de forma tolerante.
+
+    Cobre o campo plano `author` (string), `contributors[].fullName` (busca) e
+    `contributors[].firstName/lastName` + `contributorRole` (detalhe ONIX).
+    Traduz o papel via CONTRIB_ROLE_MAP quando reconhecido.
+    """
+    for key in ("contributors", "contributor", "authors", "author", "creators"):
+        arr = _get_ci(p, key)
         if arr is None:
             continue
         if isinstance(arr, str):
-            return [arr]
+            return [arr] if arr.strip() else None
         if isinstance(arr, dict):
             arr = [arr]
         if isinstance(arr, list):
             out: list[str] = []
             for c in arr:
                 if isinstance(c, str):
-                    out.append(c)
+                    if c.strip():
+                        out.append(c.strip())
                     continue
                 if not isinstance(c, dict):
                     continue
                 name = _deep_get(
-                    c,
-                    ["name", "personName", "displayName", "nameInverted",
-                     "keyNames", "fullName", "corporateName"],
+                    c, ["fullName", "name", "personName", "displayName",
+                        "corporateName", "groupName"],
                 )
-                role = _deep_get(
-                    c, ["roleText", "contributorRoleText", "role",
-                        "contributorRole"]
+                if not name:
+                    fn = _get_ci(c, "firstName")
+                    ln = _get_ci(c, "lastName")
+                    parts = [str(x).strip() for x in (fn, ln) if x and str(x).strip()]
+                    if parts:
+                        name = " ".join(parts)
+                if not name:
+                    name = _deep_get(c, ["nameInverted", "keyNames"])
+                role_raw = (
+                    _get_ci(c, "roleText") or _get_ci(c, "contributorRoleText")
+                    or _get_ci(c, "contributorRole") or _get_ci(c, "role")
+                    or _get_ci(c, "type")
                 )
+                role = None
+                if role_raw:
+                    role = CONTRIB_ROLE_MAP.get(
+                        str(role_raw).strip().upper(), str(role_raw)
+                    )
                 if name:
                     out.append(f"{name} ({role})" if role else str(name))
             if out:
@@ -162,8 +249,18 @@ def _extract_authors(p: dict) -> list[str] | None:
 
 
 def _extract_price(p: dict) -> str | None:
-    """Extrai um preço legível 'valor moeda' de forma tolerante."""
-    amount = _deep_get(p, ["priceAmount", "amount", "price", "priceValue"])
+    """Preço legível 'valor moeda' das três formas da API.
+
+    Busca/json-short usa o campo plano `priceBrl` (moeda BRL implícita); o detalhe
+    ONIX usa prices[].priceAmount + currencyCode.
+    """
+    brl = _deep_get(p, ["priceBrl"])
+    if brl is not None and str(brl).strip():
+        try:
+            return f"{float(brl):.2f} BRL"
+        except (TypeError, ValueError):
+            pass
+    amount = _deep_get(p, ["priceAmount", "priceValue"])
     currency = _deep_get(p, ["currencyCode", "currency"])
     if amount is None:
         return None
@@ -172,6 +269,44 @@ def _extract_price(p: dict) -> str | None:
     except (TypeError, ValueError):
         amount = str(amount)
     return f"{amount} {currency}".strip() if currency else amount
+
+
+def _extract_format(p: dict) -> str | None:
+    """Formato legível: prefere productType (ebook/pbook), depois código ONIX 150."""
+    pt = _deep_get(p, ["productType"])
+    if pt and str(pt).strip().lower() in PRODUCT_TYPE_MAP:
+        return PRODUCT_TYPE_MAP[str(pt).strip().lower()]
+    code = _deep_get(p, FORM_CODE_CANDS)
+    if code:
+        return PRODUCT_FORM_MAP.get(str(code).strip().upper(), str(code))
+    return str(pt) if pt else None
+
+
+def _extract_availability(p: dict) -> str | None:
+    """Disponibilidade CONFIÁVEL: usa 'state'/'active', nunca o código numérico.
+
+    availabilityStatePublisher/productAvailability são códigos cujo significado
+    não é confiável aqui, então não viram texto (ficam no detalhe reduzido).
+    """
+    st = _deep_get(p, ["state"])
+    if st and str(st).strip():
+        return STATE_MAP.get(str(st).strip().lower(), str(st).strip())
+    act = _get_ci(p, "active")
+    if isinstance(act, bool):
+        return "ativo" if act else "inativo"
+    txt = _deep_get(p, ["productAvailabilityText", "availabilityText"])
+    return str(txt).strip() if txt and str(txt).strip() else None
+
+
+def _extract_language(p: dict) -> str | None:
+    code = _deep_get(p, LANG_CANDS)
+    if not code:
+        return None
+    return LANG_MAP.get(str(code).strip().lower()[:3], str(code).strip())
+
+
+def _extract_pages(p: dict) -> Any:
+    return _deep_get(p, PAGES_CANDS)
 
 
 def _shrink(obj: Any, max_str: int = MAX_STR, max_items: int = MAX_ITEMS,
@@ -204,18 +339,26 @@ def compact_product(p: dict) -> dict:
         return {"_dados_brutos_reduzidos": _shrink(p)}
 
     out: dict[str, Any] = {}
-    for campo, cands in CANDIDATES.items():
-        val = _deep_get(p, cands)
+
+    def put(campo: str, val: Any) -> None:
         if val is not None and str(val).strip():
             out[campo] = val
 
+    # Ordem deliberada de leitura (identificação → bibliográfico → comercial).
+    put("uuid", _deep_get(p, CANDIDATES["uuid"]))
+    put("isbn", _extract_isbn(p))
+    put("titulo", _deep_get(p, CANDIDATES["titulo"]))
+    put("subtitulo", _deep_get(p, CANDIDATES["subtitulo"]))
     autores = _extract_authors(p)
     if autores:
         out["autores"] = autores
-
-    preco = _extract_price(p)
-    if preco:
-        out["preco"] = preco
+    put("editora", _deep_get(p, CANDIDATES["editora"]))
+    put("data_publicacao", _deep_get(p, CANDIDATES["data_publicacao"]))
+    put("formato", _extract_format(p))
+    put("paginas", _extract_pages(p))
+    put("idioma", _extract_language(p))
+    put("preco", _extract_price(p))
+    put("disponibilidade", _extract_availability(p))
 
     # Núcleo mínimo para considerar a projeção bem-sucedida.
     core = sum(1 for k in ("titulo", "isbn", "uuid") if k in out)

@@ -1,16 +1,59 @@
 """Tools de Produtos — endpoints: /products, /product"""
 
+import re
 from typing import Annotated, Literal, Optional
 from mcp.server.fastmcp import FastMCP, Context
 
 from ._compact import compact_search, compact_list, compact_detail
 
+
+def _title_term(search: str) -> Optional[str]:
+    """Termo de título para casar ``titulo_exato``/``aviso``.
+
+    Sem operadores (``=``): devolve a expressão inteira (quick search).
+    Com operadores: devolve o valor de ``TI=`` (preferido) ou, na falta, ``ST=``,
+    para que buscas precisas ainda marquem título exato e emitam aviso de
+    ambiguidade. Qualificadores que não são título (``AU=``, ``VL=``, ``IS=``…)
+    resultam em None — não faz sentido casar título com eles.
+    """
+    if "=" not in search:
+        return search.strip() or None
+    for qual in ("TI", "ST"):
+        m = re.search(
+            rf'\b{qual}\s*=\s*("[^"]*"|\'[^\']*\'|[^()]+?)'
+            r'(?=\s+(?:and|or|not)\b|\s*\)|$)',
+            search, re.IGNORECASE,
+        )
+        if m:
+            val = m.group(1).strip().strip('"').strip("'").strip()
+            if val:
+                return val
+    return None
+
 # Descrição reutilizada do parâmetro view nas buscas (listas).
 _VIEW_LIST = (
     "compact (padrão): lista enxuta só com campos de identificação (título, "
-    "autor, ISBN, editora, data, formato, disponibilidade), SEM sinopse, com "
-    "total de resultados e marca de título exato — ideal para identificar/"
-    "desambiguar sem alucinar. full: JSON completo da API (todos os metadados)."
+    "subtítulo, autor, ISBN, editora, data, formato, páginas, idioma, preço, "
+    "disponibilidade), SEM sinopse, com total de resultados e marca de título "
+    "exato — ideal para identificar/desambiguar sem alucinar. full: JSON "
+    "completo e cru da API (todos os metadados)."
+)
+
+# Sintaxe de busca — fonte única (espelhada no README e nas instructions do
+# server). Qualificadores CONFIRMADOS ao vivo na API (2026-07); WG foi omitido
+# por não ter sido confirmado. Um qualificador desconhecido retorna 0 resultados,
+# então listar só os que funcionam evita buscas vazias/enganosas.
+SEARCH_SYNTAX = (
+    "Termo livre (quick search em título, autor, editora, ISBN) OU expressão "
+    "booleana com qualificadores 'CHAVE=valor'. Qualificadores: "
+    "ST=texto geral, TI=título, AU=autor, VL=editora, IS=ISBN/identificador, "
+    "SW=palavra-chave/assunto, PF=formato (código ONIX lista 150), "
+    "PR=faixa de preço, EJ=ano de publicação, AD=data de alteração, "
+    "RH=ID de série. "
+    "Operadores: and, or, not e parênteses. Curinga: * (ex.: PF=E*). "
+    "Faixa com ^ (ex.: PR=40^80, AD=20240101^20241231). "
+    "Exemplos: 'ST=Linux and PF=E*', 'VL=Nova Fronteira and PF=not EA', "
+    "'TI=Dom Casmurro', 'EJ=2020'."
 )
 
 
@@ -19,11 +62,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def metabooks_search_products(
         ctx: Context,
-        search: Annotated[str, "Termo ou expressão booleana Metabooks. "
-                              "Sem prefixo: quick search (título, autor, editora, ISBN). "
-                              "Com operadores: ST=termo, AU=autor, TI=título, VL=editora, "
-                              "IS=isbn, PF=formato, EJ=ano, WG=grupo, RH=série, "
-                              "AD=data_de^data_ate. Ex: 'ST=Linux and PF=E*', 'VL=Artmed'"],
+        search: Annotated[str, SEARCH_SYNTAX],
         page: Annotated[int, "Página, base 1 (padrão 1)"] = 1,
         size: Annotated[int, "Itens por página, 1-250 (padrão 50)"] = 50,
         sort: Annotated[Optional[Literal[
@@ -55,15 +94,16 @@ def register(mcp: FastMCP) -> None:
         data = await client.get(
             "products", params=params, accept="application/json-short"
         )
-        # Só faz sentido casar título exato em quick search (sem operadores '=').
-        termo = search if "=" not in search else None
+        # Casa título exato em quick search e também no valor de TI=/ST=.
+        termo = _title_term(search)
         return compact_search(data, termo=termo, prioritize_exact=(sort is None))
 
     @mcp.tool()
     async def metabooks_batch_search_isbns(
         ctx: Context,
         isbns: Annotated[list[str], "Lista de ISBNs/GTINs (até 500). Curingas '*' aceitos (ex: '9783923*')"],
-        search: Annotated[Optional[str], "Filtro booleano adicional (opcional, ex: 'AD=20150319^20150320')"] = None,
+        search: Annotated[Optional[str], "Filtro booleano adicional opcional — mesma "
+                              "sintaxe de metabooks_search_products (ex.: 'AD=20240101^20241231', 'PF=E*')"] = None,
         page: Annotated[int, "Página, base 1 (padrão 1)"] = 1,
         size: Annotated[int, "Itens por página, 1-250 (padrão 50)"] = 50,
         view: Annotated[Literal["compact", "full"], _VIEW_LIST] = "compact",
