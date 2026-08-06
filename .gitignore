@@ -11,5 +11,9 @@ build/
 .coverage
 htmlcov/
 
+# Relatórios da rodada ao vivo (podem conter dados de catálogo)
+smoke-report.*
+*-report.md
+
 # Logs
 *.log

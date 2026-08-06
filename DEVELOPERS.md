@@ -27,7 +27,10 @@ metabooks-mcp/
 │   ├── test_compact.py     # projeção compacta, titulo_exato, envelope
 │   ├── test_files.py       # confinamento de destino, sobrescrita, extensão
 │   ├── test_api_contract.py# MCP × collection Postman oficial
+│   ├── test_live.py        # as 12 tools contra a API REAL (só com METABOOKS_LIVE=1)
 │   └── fixtures/           # Metabooks.postman_collection.json (spec executável da MVB)
+├── scripts/
+│   └── smoke_live.py       # rodada de validação da FORMA das respostas de produção
 ├── .github/workflows/ci.yml# Testes em 3 SOs × 2 versões + instalação limpa
 ├── docs/
 │   └── instalacao-mac.md   # Guia de instalação para macOS
@@ -241,6 +244,88 @@ da MVB, substitua o arquivo e rode a suíte: as divergências aparecem como falh
 3.12/3.13, e tem um job separado (`resolucao-de-dependencias`) que faz
 `pip install .` + `metabooks-mcp --help` numa árvore limpa — é a guarda contra a
 regressão do teto do SDK `mcp` descrita acima.
+
+A rodada ao vivo (abaixo) **não** entra no CI: exige credenciais de produção e
+consome um slot de sessão paralela da MVB a cada execução.
+
+## Rodada de validação contra a API real
+
+A suíte offline valida o comportamento do servidor; ela não pode confirmar que
+produção responde com as formas que simulamos. Duas ferramentas cobrem isso,
+ambas somente leitura e para rodar **na máquina de quem tem as credenciais** —
+nunca em CI compartilhado, e sem colar credenciais em chat ou issue.
+
+### 1. `scripts/smoke_live.py` — valida a FORMA das respostas
+
+```bash
+export METABOOKS_USERNAME=...        # ou METABOOKS_METADATA_TOKEN=...
+export METABOOKS_PASSWORD=...
+export METABOOKS_COVER_TOKEN=...     # opcional
+export METABOOKS_MMO_TOKEN=...       # opcional
+python scripts/smoke_live.py         # gera smoke-report.md
+```
+
+Faz **um** login, desloga no fim e sonda ~55 pontos: nomes de campo esperados por
+`_compact.py` nas três formas da API, chaves do envelope, base da paginação
+(`number` 0 vs 1), limites de `size`, `Accept` de ONIX e de `/cover`, os sete
+índices, os onze qualificadores de busca, `multipleProducts` em json e
+json-short, e o host das URLs de mídia.
+
+Garantias de sigilo, porque o relatório é feito para circular:
+
+- credenciais e tokens são substituídos por `***` em toda a saída, inclusive em
+  mensagens de erro que ecoem cabeçalhos ou querystrings;
+- por padrão o relatório traz só a **estrutura** das respostas (nomes de chaves e
+  tipos), não títulos, sinopses, preços ou ISBNs de clientes. `--incluir-amostras`
+  liga os valores reais e só deve ser usado para revisão interna;
+- `smoke-report.*` está no `.gitignore`.
+
+Código de saída 1 se houve FALHA; avisos não reprovam. As checagens mais
+importantes de ler no relatório:
+
+| Checagem | Por que importa |
+|---|---|
+| `base da paginação` | `_compact._envelope` faz `pagina = number + 1`. Se produção não for base 0, a normalização está errada. |
+| `busca json-short` / `detalhe (json)` | Lista os campos esperados que estiverem AUSENTES. Campo renomeado = projeção compacta empobrecendo em silêncio. |
+| `tipos de identificador` | Sem `productIdentifierType=15`, o ISBN-13 do detalhe compacto sai errado. |
+| `URL de mídia (…)` | Chama `client._same_api_host` na URL real. **FALHA aqui significa que a guarda anti-SSRF endurecida está bloqueando mídia legítima** — é a regressão mais provável da v2.6.0. |
+| `size=251` / `size=0` | Confirma que os limites do schema (1–250) coincidem com os da API. |
+| `POST /products (json)` | O MCP envia `Content-Type: application/json`; a collection sugere `json-short`. Um 415 aqui indica que `client.post` precisa espelhar o `Accept`. |
+| `qualificador …` | 0 resultados pode ser catálogo sem correspondência **ou** qualificador inexistente. Confira à mão os que aparecerem com aviso antes de mantê-los no help. |
+| `index/…` | Um índice que responda 4xx deve sair do `Literal` de `metabooks_index_search`. |
+
+### 2. `tests/test_live.py` — valida o RESULTADO das tools
+
+```bash
+export METABOOKS_LIVE=1
+export METABOOKS_USERNAME=... METABOOKS_PASSWORD=...
+pytest tests/test_live.py -v
+```
+
+Roda as 12 tools através de uma sessão MCP real contra produção e verifica o que
+o Claude efetivamente recebe: projeção compacta preenchida (falha explicitamente
+se cair na rede de segurança do `_shrink`, o sinal de que os nomes de campo
+mudaram), `titulo_exato` casando com dado real, paginação sem repetir registros,
+ONIX voltando XML, capa renderizável dentro do limite inline, imagem de mídia
+reduzida a ≤ 1024 px, e o confinamento de download valendo também em produção.
+
+Sem `METABOOKS_LIVE=1` a suíte é pulada; os downloads vão para a `tmp_path` do
+pytest, nunca para `~/Downloads`. Testes sem dado aplicável (título sem capa, sem
+mídia cadastrada) aparecem como `skip` com o motivo, não como falha.
+
+Personalização: `METABOOKS_LIVE_BUSCA`, `METABOOKS_LIVE_ISBN`,
+`METABOOKS_LIVE_EDITORA`.
+
+### Ordem sugerida
+
+1. `python scripts/smoke_live.py` e leia a seção **Falhas** do relatório.
+2. `METABOOKS_LIVE=1 pytest tests/test_live.py -v`.
+3. Havendo divergência, o ajuste é quase sempre em `tools/_compact.py` (nomes de
+   campo), `client._same_api_host` (host de mídia) ou nos limites em
+   `tools/produtos.py`. Depois de corrigir, `pytest -q` para garantir que a suíte
+   offline continua verde e atualize a API falsa em `tests/fake_api.py` para
+   refletir o comportamento real observado — é o que impede a divergência de
+   voltar.
 
 ## Como adicionar uma nova ferramenta
 
