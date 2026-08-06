@@ -1,0 +1,1059 @@
+{
+	"info": {
+		"_postman_id": "827a0ee3-7ef6-436a-8e3e-06501c324909",
+		"name": "Metabooks Postman configuration file",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Live Metabooks example REST-API calls",
+			"item": [
+				{
+					"name": "Login (generate token)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\"username\": \"USERNAME\",\n\"password\": \"PASSWORT\"\n}"
+						},
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/login",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/logout",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"logout"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "bulksearch  - [json short]",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json-short"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json-short"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \"content\": [ { \"isbn\": \"3371010306305\"} ,\n{ \"isbn\": \"9910004286595\"} ,\n{ \"isbn\": \"9783981706611\"} ,\n{ \"isbn\": \"9990051402926\"} ,\n{ \"isbn\": \"9783981703511\"} ,\n{ \"isbn\": \"9783981654356\"} ,\n{ \"isbn\": \"9783981486315\"} ,\n{ \"isbn\": \"9783981218138\"} ,\n{ \"isbn\": \"9783981205572\"} ,\n{ \"isbn\": \"9783980769259\"} ,\n{ \"isbn\": \"9783980558723\"} ,\n{ \"isbn\": \"9783980498739\"} ,\n{ \"isbn\": \"9783958470064\"} ,\n{ \"isbn\": \"9783957741318\"} ,\n{ \"isbn\": \"9783954046621\"} ,\n{ \"isbn\": \"9783945465080\"} ,\n{ \"isbn\": \"9783944831138\"} ,\n{ \"isbn\": \"9783944789262\"} ,\n{ \"isbn\": \"9783944789248\"} ,\n{ \"isbn\": \"9783944501123\"} ,\n{ \"isbn\": \"9783943807790\"} ,\n{ \"isbn\": \"9783943807783\"} ,\n{ \"isbn\": \"9783943582116\"} ,\n{ \"isbn\": \"9783943431063\"} ,\n{ \"isbn\": \"9783942983112\"} ,\n{ \"isbn\": \"9783942375191\"} ,\n{ \"isbn\": \"9783941593442\"} ,\n{ \"isbn\": \"9783941513020\"} ,\n{ \"isbn\": \"9783941482432\"} ,\n{ \"isbn\": \"9783941155466\"} ,\n{ \"isbn\": \"9783940435149\"} ,\n{ \"isbn\": \"9783939828129\"} ,\n{ \"isbn\": \"9783938967683\"} ,\n{ \"isbn\": \"9783937785998\"} ,\n{ \"isbn\": \"9783936311877\"} ,\n{ \"isbn\": \"9783935992589\"} ,\n{ \"isbn\": \"9783935955782\"} ,\n{ \"isbn\": \"9783935806190\"} ,\n{ \"isbn\": \"9783935517720\"} ,\n{ \"isbn\": \"9783933193513\"} ,\n{ \"isbn\": \"9783932381676\"} ,\n{ \"isbn\": \"9783932381621\"} ,\n{ \"isbn\": \"9783932313059\"} ,\n{ \"isbn\": \"9783929879810\"} ,\n{ \"isbn\": \"9783929879025\"} ,\n{ \"isbn\": \"9783929879018\"} ,\n{ \"isbn\": \"9783928878555\"} ,\n{ \"isbn\": \"9783928412131\"} ,\n{ \"isbn\": \"9783905800425\"} ,\n{ \"isbn\": \"9783902114891\"} ,\n{ \"isbn\": \"9783896413321\"} ,\n{ \"isbn\": \"9783891801499\"} , \n{ \"isbn\": \"9783891315323\"} , \n{ \"isbn\": \"9783885795520\"} , \n{ \"isbn\": \"9783880136946\"} , \n{ \"isbn\": \"9783874490603\"} , \n{ \"isbn\": \"9783866855083\"} , \n{ \"isbn\": \"9783865340641\"} , \n{ \"isbn\": \"9783864730610\"} , \n{ \"isbn\": \"9783864730603\"} , \n{ \"isbn\": \"9783862490028\"} , \n{ \"isbn\": \"9783861377757\"} , \n{ \"isbn\": \"9783861215448\"} , \n{ \"isbn\": \"9783861212782\"} , \n{ \"isbn\": \"9783861212775\"} , \n{ \"isbn\": \"9783861212768\"} , \n{ \"isbn\": \"9783861212577\"} , \n{ \"isbn\": \"9783846800096\"} , \n{ \"isbn\": \"9783837781090\"} , \n{ \"isbn\": \"9783835583115\"} , \n{ \"isbn\": \"9783835530553\"} , \n{ \"isbn\": \"9783827191670\"} , \n{ \"isbn\": \"9783804566118\"} , \n{ \"isbn\": \"9783804555037\"} , \n{ \"isbn\": \"9783766173164\"} , \n{ \"isbn\": \"9783749302444\"} , \n{ \"isbn\": \"9783608821642\"} , \n{ \"isbn\": \"9783507879829\"} , \n{ \"isbn\": \"9783507101739\"} , \n{ \"isbn\": \"9783282000173\"} , \n{ \"isbn\": \"9783141273700\"} , \n{ \"isbn\": \"9783126749046\"} , \n{ \"isbn\": \"9783126749039\"} , \n{ \"isbn\": \"9783126749008\"} , \n{ \"isbn\": \"9783125628700\"} , \n{ \"isbn\": \"9783124436313\"} , \n{ \"isbn\": \"9783120041122\"} , \n{ \"isbn\": \"9783000432095\"} , \n{ \"isbn\": \"9781864718232\"} , \n{ \"isbn\": \"9781783985081\"} , \n{ \"isbn\": \"9780596807504\"} , \n{ \"isbn\": \"9780198140726\"} , \n{ \"isbn\": \"9780062330208\"} , \n{ \"isbn\": \"8005125698080\"} , \n{ \"isbn\": \"5414233182641\"} , \n{ \"isbn\": \"5026555413411\"} , \n{ \"isbn\": \"5016488126663\"} , \n{ \"isbn\": \"4260211580180\"} , \n{ \"isbn\": \"4260211580067\"} , \n{ \"isbn\": \"4260160896899\"} , \n{ \"isbn\": \"4260158197120\"} , \n{ \"isbn\": \"4260155681547\"} , \n{ \"isbn\": \"4260094455056\"} , \n{ \"isbn\": \"4250654806794\"} , \n{ \"isbn\": \"4250124341848\"} , \n{ \"isbn\": \"4198476306507\"} , \n{ \"isbn\": \"4047443198280\"} , \n{ \"isbn\": \"4041445761350\"} , \n{ \"isbn\": \"4038858101484\"} , \n{ \"isbn\": \"4029856840123\"} , \n{ \"isbn\": \"4029856840116\"} , \n{ \"isbn\": \"4029856840048\"} , \n{ \"isbn\": \"3371010306305\"} \n             ]          \n}"
+						},
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/products?page=1&size=250&sort=identifier&direction=asc",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"products"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "size",
+									"value": "250"
+								},
+								{
+									"key": "sort",
+									"value": "identifier"
+								},
+								{
+									"key": "direction",
+									"value": "asc"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "bulk detailcall  - [json]",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json-short"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json-short"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"ids\": \r\n   [\r\n\"47d9846e83264ea6a1106a84418a68fa\",\r\n\"50d434b4865d43099f415da91d362449\",\r\n\"e2d902eb2edf419db8c86c1536a3b300\",\r\n\"e1bda60e011f43629f8f59a6419dd294\"\r\n    ]\r\n}"
+						},
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/product/multipleProducts",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"product",
+								"multipleProducts"
+							]
+						},
+						"description": "only in json format (no json-short or ONIX response available)\n\n do not enter ISBN here but product IDs"
+					},
+					"response": []
+				},
+				{
+					"name": "quicksearch [json] with default values",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/products?page=1&size=250&search=Linux",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"products"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "size",
+									"value": "250"
+								},
+								{
+									"key": "search",
+									"value": "Linux"
+								}
+							]
+						},
+						"description": "search request with default values\n\nsort (optional, default: score descending)\ndirection (optional)\nactive (optional, active=true, active=false, default: active and inactive articles)  \nsearch (boolean search parameters are optional, without boolean parameters this is a quickserach)"
+					},
+					"response": []
+				},
+				{
+					"name": "quicksearch Pão de Açúcar [json]",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/products?page=1&size=250&sort=identifier&direction=asc&active=true&search=P%C3%A3o%20de%20A%C3%A7%C3%BAcar",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"products"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "size",
+									"value": "250"
+								},
+								{
+									"key": "sort",
+									"value": "identifier"
+								},
+								{
+									"key": "direction",
+									"value": "asc"
+								},
+								{
+									"key": "active",
+									"value": "true"
+								},
+								{
+									"key": "search",
+									"value": "P%C3%A3o%20de%20A%C3%A7%C3%BAcar"
+								}
+							]
+						},
+						"description": "the serach phrase is URL encoded:\nPão de Açúcar will be P%C3%A3o%20de%20A%C3%A7%C3%BAcar"
+					},
+					"response": []
+				},
+				{
+					"name": "quicksearch - active articles [json short]",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json-short"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json-short"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/products?page=1&size=250&sort=identifier&direction=asc&active=true&search=Linux",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"products"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "size",
+									"value": "250"
+								},
+								{
+									"key": "sort",
+									"value": "identifier"
+								},
+								{
+									"key": "direction",
+									"value": "asc"
+								},
+								{
+									"key": "active",
+									"value": "true"
+								},
+								{
+									"key": "search",
+									"value": "Linux"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "keyword(ST)search - inactive articles [json]",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/products?page=1&size=250&active=false&search=ST%3DJaneiro",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"products"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "size",
+									"value": "250"
+								},
+								{
+									"key": "active",
+									"value": "false"
+								},
+								{
+									"key": "search",
+									"value": "ST%3DJaneiro"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "search by changedate",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/products?page=1&size=250&search=VL%3DPUBLISHERNAME%20and%20AD%3D20190301%5E20190815",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"products"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "size",
+									"value": "250"
+								},
+								{
+									"key": "search",
+									"value": "VL%3DPUBLISHERNAME%20and%20AD%3D20190301%5E20190815"
+								}
+							]
+						},
+						"description": "for example: VL%3DEditora%20Contexto%20and%20AD%3D20190301%5E20190815"
+					},
+					"response": []
+				},
+				{
+					"name": "search for productform not EA",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/products?page=1&size=250&sort=identifier&active=true&direction=asc&search=VL%3DArtmed%20and%3DPF%3Dnot%20EA",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"products"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "size",
+									"value": "250"
+								},
+								{
+									"key": "sort",
+									"value": "identifier"
+								},
+								{
+									"key": "active",
+									"value": "true"
+								},
+								{
+									"key": "direction",
+									"value": "asc"
+								},
+								{
+									"key": "search",
+									"value": "VL%3DArtmed%20and%3DPF%3Dnot%20EA"
+								}
+							]
+						},
+						"description": "for the productform search note ONIX 3 code list 150 (https://ns.editeur.org/onix/en/150)\n\nfrom list 150:\nEA: Digital (delivered electronically)"
+					},
+					"response": []
+				},
+				{
+					"name": "search with price-restriction",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json-short"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json-short"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/products?page=1&size=250&sort=identifier&direction=desc&status=active&search=VL%20PUBLISHERNAME%20and%20PR%3D14%5E15",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"products"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "size",
+									"value": "250"
+								},
+								{
+									"key": "sort",
+									"value": "identifier"
+								},
+								{
+									"key": "direction",
+									"value": "desc"
+								},
+								{
+									"key": "status",
+									"value": "active"
+								},
+								{
+									"key": "search",
+									"value": "VL%20PUBLISHERNAME%20and%20PR%3D14%5E15"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "search with state",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/products?page=1&size=20&sort=identifier&direction=asc&active=true&search=ST%3DLinux",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"products"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "size",
+									"value": "20"
+								},
+								{
+									"key": "sort",
+									"value": "identifier"
+								},
+								{
+									"key": "direction",
+									"value": "asc"
+								},
+								{
+									"key": "active",
+									"value": "true"
+								},
+								{
+									"key": "search",
+									"value": "ST%3DLinux"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "keyword(ST) search with productform",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/products?page=1&size=100&sort=identifier&direction=desc&search=ST%3Dlinux%20and%20PF%3DE*",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"products"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "size",
+									"value": "100"
+								},
+								{
+									"key": "sort",
+									"value": "identifier"
+								},
+								{
+									"key": "direction",
+									"value": "desc"
+								},
+								{
+									"key": "search",
+									"value": "ST%3Dlinux%20and%20PF%3DE*"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "series search by series ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/products?page=1&size=100&search=RH%3DAAABX01",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"products"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "size",
+									"value": "100"
+								},
+								{
+									"key": "search",
+									"value": "RH%3DAAABX01"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "detail-call by UUID - [json]",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/product/747b3a57d4154dd9b00fbe3bcd9d077e",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"product",
+								"747b3a57d4154dd9b00fbe3bcd9d077e"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "media-object listing - by UUID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_MEDIA_TOKEN_HERE"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/asset/mmo/b0064c2bf495431ba338d9004a10dfaa",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"asset",
+								"mmo",
+								"b0064c2bf495431ba338d9004a10dfaa"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "detail-call by UUID - (many fields used) - [json]",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/product/93a36c7b6c2c4a14920916054ad95ed0",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"product",
+								"93a36c7b6c2c4a14920916054ad95ed0"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "detailcall by UUID - [ONIX 3.0 ref]",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/onix30-ref"
+							},
+							{
+								"key": "Accept",
+								"value": "application/onix30-ref"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/product/93a36c7b6c2c4a14920916054ad95ed0",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"product",
+								"93a36c7b6c2c4a14920916054ad95ed0"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "detail-call by UUID - [ONIX 3.0 -short]",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/onix30-short"
+							},
+							{
+								"key": "Accept",
+								"value": "application/onix30-short"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/product/93a36c7b6c2c4a14920916054ad95ed0",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"product",
+								"93a36c7b6c2c4a14920916054ad95ed0"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "detail-call by ISBN - [ONIX 3.0 short]",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/onix30-short"
+							},
+							{
+								"key": "Accept",
+								"value": "application/onix30-short"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/product/9788087062272/isbn13",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"product",
+								"9788087062272",
+								"isbn13"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "detail-call - by ISBN - [json]",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/product/9788087062272/isbn13",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"product",
+								"9788087062272",
+								"isbn13"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "detail-call ISBN - BUNDLE - [json]",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/product/9783035605563/isbn13",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"product",
+								"9783035605563",
+								"isbn13"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Publisherdata by publisher ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer ENTER_TOKEN_HERE"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "https://api.metabooks.com/api/v2/publisher/BR0090012",
+							"protocol": "https",
+							"host": [
+								"api",
+								"metabooks",
+								"com"
+							],
+							"path": [
+								"api",
+								"v2",
+								"publisher",
+								"BR0090012"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

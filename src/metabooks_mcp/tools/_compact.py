@@ -409,7 +409,10 @@ def _envelope(data: Any, mostrando: int) -> dict:
                             ("total_paginas", TOTAL_PAGES_KEYS)):
             v = _deep_get(data, keys)
             if isinstance(v, (int, float)):
-                env[label] = v
+                # A API é paginada no estilo Spring: o parâmetro `page` é base 1
+                # (ver collection Postman) e o campo `number` da resposta é base 0.
+                # Reportar o número cru faria 'pagina: 0' para a página 1 pedida.
+                env[label] = int(v) + 1 if label == "pagina" else v
     else:
         env["total"] = mostrando
     env["mostrando"] = mostrando
@@ -427,10 +430,15 @@ def compact_list(data: Any) -> dict:
 
 def compact_search(data: Any, termo: str | None = None,
                    prioritize_exact: bool = True) -> dict:
-    """Como compact_list, mas marca correspondência exata de título e orienta.
+    """Como compact_list, mas marca correspondência de título e orienta.
 
-    - Marca ``titulo_exato`` por item (termo bate com o título, sem acento/caixa).
-    - Se ``prioritize_exact`` (sem ordenação explícita), sobe os títulos exatos.
+    - ``titulo_exato``: o título é IGUAL ao termo (sem acento/caixa/espaço extra).
+    - ``titulo_contem``: o termo aparece no título, mas o título é mais longo
+      (ex.: "Análise de Dom Casmurro para o Enem" para o termo "Dom Casmurro").
+      Marcar isso como exato — o que a versão anterior fazia — promovia ruído ao
+      topo e destruía justamente a desambiguação que este módulo existe para dar.
+    - Se ``prioritize_exact`` (sem ordenação explícita), sobe os exatos e, depois,
+      os que contêm o termo.
     - Inclui ``aviso`` quando há ambiguidade (0 ou >1 exatos entre vários
       resultados) — orienta a IA a pedir confirmação em vez de chutar (TC-08/09).
     - Inclui ``aviso_paginacao`` quando a página não é o conjunto completo (PS-03).
@@ -443,13 +451,22 @@ def compact_search(data: Any, termo: str | None = None,
         nt = _norm(termo)
         for c in resultados:
             titulo = _norm(c.get("titulo", ""))
-            c["titulo_exato"] = bool(titulo) and (
-                titulo == nt or titulo.startswith(nt + " ") or f" {nt} " in f" {titulo} "
+            exato = bool(titulo) and bool(nt) and titulo == nt
+            contem = bool(titulo) and bool(nt) and not exato and (
+                titulo.startswith(nt + " ") or f" {nt} " in f" {titulo} "
+                or titulo.endswith(" " + nt)
             )
-            if c.get("titulo_exato"):
+            c["titulo_exato"] = exato
+            c["titulo_contem"] = contem
+            if exato:
                 exatos += 1
-        if prioritize_exact and exatos:
-            resultados.sort(key=lambda c: not c.get("titulo_exato", False))
+        if prioritize_exact:
+            resultados.sort(
+                key=lambda c: (
+                    not c.get("titulo_exato", False),
+                    not c.get("titulo_contem", False),
+                )
+            )
 
     total = out.get("total", len(resultados))
     if termo and len(resultados) > 1:

@@ -3,6 +3,8 @@
 from typing import Annotated, Literal
 from mcp.server.fastmcp import FastMCP, Context
 
+from ..client import path_segment
+
 
 def register(mcp: FastMCP) -> None:
 
@@ -17,6 +19,6 @@ def register(mcp: FastMCP) -> None:
     ) -> dict:
         """Consulta um índice para autocompletar/descobrir valores (autores, editoras, séries etc.)."""
         client = ctx.request_context.lifespan_context["metabooks"]
-        data = await client.get(f"index/{field}/{term}")
+        data = await client.get(f"index/{path_segment(field)}/{path_segment(term)}")
         entries: list = data if isinstance(data, list) else []
         return {"field": field, "term": term, "count": len(entries), "entries": entries}

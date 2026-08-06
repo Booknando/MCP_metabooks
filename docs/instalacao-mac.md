@@ -177,7 +177,7 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 |---|---|
 | Buscar por palavras-chave | Encontra livros por título, autor, editora, ISBN e outros filtros |
 | Busca em lote de ISBNs | Consulta até 500 ISBNs de uma vez |
-| Detalhes de um livro | Retorna todos os metadados de um título (JSON ou ONIX 3.0) |
+| Detalhes de um livro | Retorna os metadados de um título — resumido (padrão) ou completo (JSON ou ONIX 3.0) |
 | Detalhes de vários livros | Consulta vários UUIDs ao mesmo tempo |
 | Visualizar capa | Exibe a imagem da capa direto na conversa (exige token de capa) |
 | URL da capa | Retorna o link direto para a imagem da capa (uso autenticado; não abre no navegador) |
@@ -243,12 +243,17 @@ Não é necessário alterar o `claude_desktop_config.json`, a configuração con
 ## Segurança
 
 - Suas credenciais ficam só no seu computador, dentro do `claude_desktop_config.json`.
-- O servidor roda localmente e se comunica diretamente com a API da Metabooks, nenhum dado passa por servidores de terceiros.
+- O servidor roda localmente e se comunica diretamente com a API da Metabooks, nenhum dado passa por servidores de terceiros. O token nunca vai numa URL: capas e mídias são baixadas com o token no cabeçalho.
+- Somente leitura: nenhuma ferramenta altera dados na Metabooks.
+- Downloads são confinados a `~/Downloads`, não sobrescrevem arquivos existentes sem pedido explícito e sempre recebem a extensão do conteúdo real. Para liberar outra pasta, acrescente no bloco `env` (no Mac o separador é `:`):
+```json
+"METABOOKS_DOWNLOAD_DIR": "/Users/SEU_USUARIO/Downloads:/Volumes/Trabalho/capas"
+```
 - Não compartilhe o arquivo `claude_desktop_config.json` com outras pessoas.
 
 ## Licença
 
-Uso interno Booknando. A API Metabooks pertence à MVB.
+Software proprietário da Booknando Livros: licença de uso apenas, sem direito de redistribuição ou modificação. Veja [LICENSE](../LICENSE). A API Metabooks e seus dados pertencem à MVB.
 
 ---
 

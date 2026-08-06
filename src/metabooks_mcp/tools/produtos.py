@@ -3,8 +3,18 @@
 import re
 from typing import Annotated, Literal, Optional
 from mcp.server.fastmcp import FastMCP, Context
+from pydantic import Field
 
+from ..client import path_segment
 from ._compact import compact_search, compact_list, compact_detail
+
+# Limites da API confirmados na collection Postman oficial: `page` é base 1 e
+# `size` vai até 250 (os exemplos usam size=250 como máximo).
+MAX_PAGE_SIZE = 250
+# Itens por requisição em lote. A busca por ISBN aceita uma lista maior que uma
+# página (o resultado vem paginado); multipleProducts trabalha por UUID.
+MAX_BULK_ISBNS = 500
+MAX_BULK_IDS = 250
 
 
 def _title_term(search: str) -> Optional[str]:
@@ -63,8 +73,12 @@ def register(mcp: FastMCP) -> None:
     async def metabooks_search_products(
         ctx: Context,
         search: Annotated[str, SEARCH_SYNTAX],
-        page: Annotated[int, "Página, base 1 (padrão 1)"] = 1,
-        size: Annotated[int, "Itens por página, 1-250 (padrão 50)"] = 50,
+        page: Annotated[int, Field(ge=1, description="Página, base 1 (padrão 1)")] = 1,
+        size: Annotated[
+            int,
+            Field(ge=1, le=MAX_PAGE_SIZE,
+                  description=f"Itens por página, 1-{MAX_PAGE_SIZE} (padrão 50)"),
+        ] = 50,
         sort: Annotated[Optional[Literal[
             "identifier", "author", "titleAndSubtitle", "publisher",
             "publicationDate", "productAvailability", "price",
@@ -101,11 +115,20 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def metabooks_batch_search_isbns(
         ctx: Context,
-        isbns: Annotated[list[str], "Lista de ISBNs/GTINs (até 500). Curingas '*' aceitos (ex: '9783923*')"],
+        isbns: Annotated[
+            list[str],
+            Field(min_length=1, max_length=MAX_BULK_ISBNS,
+                  description=f"Lista de ISBNs/GTINs (até {MAX_BULK_ISBNS}). "
+                              "Curingas '*' aceitos (ex: '9783923*')"),
+        ],
         search: Annotated[Optional[str], "Filtro booleano adicional opcional — mesma "
                               "sintaxe de metabooks_search_products (ex.: 'AD=20240101^20241231', 'PF=E*')"] = None,
-        page: Annotated[int, "Página, base 1 (padrão 1)"] = 1,
-        size: Annotated[int, "Itens por página, 1-250 (padrão 50)"] = 50,
+        page: Annotated[int, Field(ge=1, description="Página, base 1 (padrão 1)")] = 1,
+        size: Annotated[
+            int,
+            Field(ge=1, le=MAX_PAGE_SIZE,
+                  description=f"Itens por página, 1-{MAX_PAGE_SIZE} (padrão 50)"),
+        ] = 50,
         view: Annotated[Literal["compact", "full"], _VIEW_LIST] = "compact",
     ) -> dict:
         """Consulta vários ISBNs/GTINs de uma vez (até 500). ISBNs sem correspondência não aparecem."""
@@ -147,9 +170,9 @@ def register(mcp: FastMCP) -> None:
         voltam crus (XML), independentes de view.
         """
         client = ctx.request_context.lifespan_context["metabooks"]
-        path = f"product/{id}"
+        path = f"product/{path_segment(id)}"
         if id_type != "uuid":
-            path += f"/{id_type}"
+            path += f"/{path_segment(id_type)}"
         if format.startswith("onix"):
             return await client.get(path, accept=f"application/{format}")
         data = await client.get(path)
@@ -160,15 +183,22 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def metabooks_get_multiple_products(
         ctx: Context,
-        ids: Annotated[list[str], "Lista de UUIDs de produto (32 chars, até 250). Ordem preservada."],
+        ids: Annotated[
+            list[str],
+            Field(min_length=1, max_length=MAX_BULK_IDS,
+                  description=f"Lista de UUIDs de produto (32 chars, até {MAX_BULK_IDS}). "
+                              "Ordem preservada. NÃO aceita ISBN — use "
+                              "metabooks_batch_search_isbns para ISBNs."),
+        ],
         view: Annotated[Literal["compact", "full"], _VIEW_LIST] = "compact",
     ) -> dict:
         """Recupera os dados de vários produtos de uma vez a partir de UUIDs."""
         client = ctx.request_context.lifespan_context["metabooks"]
+        # Este endpoint só responde em JSON longo — a collection oficial anota
+        # "only in json format (no json-short or ONIX response available)". Pedir
+        # json-short aqui arrisca 406/resposta inesperada; a redução fica só na
+        # projeção local.
+        data = await client.post("product/multipleProducts", json={"ids": ids})
         if view == "full":
-            return await client.post("product/multipleProducts", json={"ids": ids})
-        data = await client.post(
-            "product/multipleProducts", json={"ids": ids},
-            accept="application/json-short",
-        )
+            return data
         return compact_list(data)

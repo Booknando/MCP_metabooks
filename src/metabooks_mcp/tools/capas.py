@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Annotated, Literal
 from mcp.server.fastmcp import FastMCP, Context, Image
 
-from ._files import resolve_target
+from ..client import path_segment
+from ._files import DestinationError, allowed_roots, resolve_target
 
 # --- MCP Apps (extensão io.modelcontextprotocol/ui) — EXPERIMENTAL --------------
 # Quando METABOOKS_ENABLE_UI_APP está ligado, a tool view_cover passa a referenciar
@@ -64,7 +65,7 @@ def register(mcp: FastMCP) -> None:
             # 406 Not Acceptable a "Accept: image/jpeg" (e 403 a "image/*").
             # Só "*/*" retorna o binário (image/jpeg) — vale para v1 e v2.
             data = await client.get_bytes(
-                f"cover/{id}/{size}", scope="cover", accept="*/*"
+                f"cover/{path_segment(id)}/{path_segment(size)}", scope="cover", accept="*/*"
             )
         except Exception as exc:  # noqa: BLE001 — devolve erro amigável ao cliente MCP
             return {
@@ -87,8 +88,15 @@ def register(mcp: FastMCP) -> None:
         dest: Annotated[
             str | None,
             "Destino opcional: caminho de um arquivo .jpg OU uma pasta (o nome do "
-            "arquivo é gerado). Se omitido, salva em ~/Downloads (ou pasta temporária).",
+            "arquivo é gerado). Precisa estar DENTRO das pastas permitidas — por "
+            "padrão ~/Downloads (ajustável em METABOOKS_DOWNLOAD_DIR). Se omitido, "
+            "salva na pasta permitida padrão.",
         ] = None,
+        overwrite: Annotated[
+            bool,
+            "Se o arquivo já existir, substituir? Padrão false (a gravação falha "
+            "em vez de sobrescrever sem aviso).",
+        ] = False,
     ) -> dict:
         """Baixa a capa e salva em arquivo no disco; retorna o caminho.
 
@@ -104,10 +112,10 @@ def register(mcp: FastMCP) -> None:
                     "Capas exigem token dedicado — login/metadados não as acessa (seção 5.5.5)."
                 )
             }
-        size_segment = f"/{size}" if size != "original" else ""
+        size_segment = f"/{path_segment(size)}" if size != "original" else ""
         try:
             data = await client.get_bytes(
-                f"cover/{id}{size_segment}", scope="cover", accept="*/*"
+                f"cover/{path_segment(id)}{size_segment}", scope="cover", accept="*/*"
             )
         except Exception as exc:  # noqa: BLE001 — devolve erro amigável ao cliente MCP
             return {
@@ -125,7 +133,12 @@ def register(mcp: FastMCP) -> None:
             }
 
         filename = f"capa_{id}_{size}.jpg"
-        target = resolve_target(dest, filename)
+        try:
+            target = resolve_target(
+                dest, filename, expected_ext="jpg", overwrite=overwrite
+            )
+        except DestinationError as exc:
+            return {"error": str(exc), "pastas_permitidas": allowed_roots()}
         try:
             os.makedirs(os.path.dirname(target), exist_ok=True)
             with open(target, "wb") as fh:
@@ -159,13 +172,16 @@ def register(mcp: FastMCP) -> None:
         inline, sem URL). Exige METABOOKS_COVER_TOKEN para o acesso efetivo.
         """
         client = ctx.request_context.lifespan_context["metabooks"]
-        size_segment = f"/{size}" if size != "original" else ""
-        cover_url = f"{client.base_url}/cover/{id}{size_segment}"
+        size_segment = f"/{path_segment(size)}" if size != "original" else ""
+        cover_url = f"{client.base_url}/cover/{path_segment(id)}{size_segment}"
         return {
             "id": id,
             "size": size,
             "cover_url": cover_url,
-            "auth": "Requer token de capa (Authorization: Bearer ... ou ?access_token=...).",
+            # Deliberadamente NÃO sugerimos ?access_token=: token em querystring
+            # vaza para logs de servidor, proxies e histórico (seção 5.5.5/5.10.1).
+            "auth": "Requer o token de capa no cabeçalho: 'Authorization: Bearer <token>'. "
+                    "Não passe o token na querystring.",
             "accept": "Envie 'Accept: */*' — o servidor responde 406 a 'image/jpeg' e 403 a 'image/*'.",
             "browser_openable": False,
             "display_hint": "Para exibir na conversa use metabooks_view_cover (NÃO cole esta URL como imagem).",

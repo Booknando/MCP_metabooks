@@ -239,11 +239,11 @@ Abra `%APPDATA%\Roaming\Claude\logs\mcp-server-metabooks.log` e procure a linha 
 | Detalhes de um livro | Retorna os metadados de um título — resumido (padrão) ou completo (JSON ou ONIX 3.0) |
 | Detalhes de vários livros | Consulta vários UUIDs ao mesmo tempo |
 | Visualizar capa | Exibe a imagem da capa direto na conversa, em tamanho leve (exige token de capa) |
-| Baixar capa | Salva a capa em arquivo no disco — use para o tamanho original (exige token de capa) |
+| Baixar capa | Salva a capa em `~/Downloads` — use para o tamanho original (exige token de capa) |
 | URL da capa | Retorna o link direto para a imagem da capa (uso autenticado; não abre no navegador) |
 | Listar mídias | Lista as mídias do título (quarta capa, miolo, sumário, foto do autor) com seus `asset_id` |
 | Visualizar mídia | Exibe uma imagem de mídia (quarta capa, miolo, foto do autor) direto na conversa (exige token de MMO) |
-| Baixar mídia | Salva qualquer mídia em arquivo — capas extras, miolo, sumário em PDF, áudio (exige token de MMO) |
+| Baixar mídia | Salva qualquer mídia em `~/Downloads` — capas extras, miolo, sumário em PDF, áudio (exige token de MMO) |
 | Autocomplete | Sugere autores, editoras, títulos e palavras-chave |
 | Dados de editora | Retorna nome, endereço, CNPJ e prefixos ISBN da editora |
 
@@ -329,14 +329,26 @@ Não é necessário alterar o `claude_desktop_config.json` — a configuração 
 ## Segurança
 
 - Suas credenciais ficam **só no seu computador**, dentro do `claude_desktop_config.json`.
-- O servidor roda localmente e se comunica diretamente com a API da Metabooks — nenhum dado passa por servidores de terceiros.
+- O servidor roda localmente e se comunica diretamente com a API da Metabooks — nenhum dado passa por servidores de terceiros. O token nunca vai numa URL: capas e mídias são baixadas com o token no cabeçalho.
+- **Somente leitura.** Nenhuma ferramenta altera dados na Metabooks: não há upload de capa, edição de sinopse nem qualquer escrita.
+- **Downloads são confinados.** As ferramentas de download só gravam dentro de `~/Downloads` (ou nas pastas que você liberar em `METABOOKS_DOWNLOAD_DIR`), nunca sobrescrevem um arquivo existente sem que você peça, e a extensão é sempre a do conteúdo real. Isso impede que um pedido disfarçado dentro dos metadados de um livro faça o Claude gravar sobre seus arquivos — inclusive sobre o próprio `claude_desktop_config.json`, que guarda suas credenciais.
 - Não compartilhe o arquivo `claude_desktop_config.json` com outras pessoas.
+
+### Escolher outra pasta para os downloads
+
+Se você precisa salvar fora de `~/Downloads`, libere a pasta no bloco `env`:
+
+```json
+"METABOOKS_DOWNLOAD_DIR": "C:\\Users\\SEU_USUARIO\\Downloads;D:\\capas"
+```
+
+No Mac e no Linux o separador é `:` em vez de `;`. Libere só o que precisar — o objetivo da restrição é justamente limitar o alcance da gravação.
 
 ---
 
 ## Licença
 
-Uso interno Booknando. A API Metabooks pertence à MVB.
+Software proprietário da Booknando Livros: licença de **uso apenas**, sem direito de redistribuição ou modificação. Veja [LICENSE](LICENSE). A API Metabooks e seus dados pertencem à MVB, e o uso deste servidor não substitui nem amplia o seu contrato com ela.
 
 ---
 

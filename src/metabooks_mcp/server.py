@@ -8,6 +8,7 @@ from collections.abc import AsyncIterator
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 
+from . import __version__
 from .client import MetabooksClient
 from .tools import produtos, capas, midia, indice, editora
 
@@ -45,16 +46,21 @@ def main() -> None:
             "  METABOOKS_METADATA_TOKEN                 — token de metadados (staging/rc)\n"
             "  METABOOKS_COVER_TOKEN                    — token para capas\n"
             "  METABOOKS_MMO_TOKEN                      — token para mídias (MMO)\n"
-            "  METABOOKS_BASE_URL                       — URL base (opcional, para override)\n\n"
-            "Configure em ~/.config/metabooks-mcp/.env ou como variáveis de ambiente."
+            "  METABOOKS_BASE_URL                       — URL base (opcional, para override)\n"
+            "  METABOOKS_DOWNLOAD_DIR                   — pastas onde downloads podem ser gravados\n\n"
+            "Configure em ~/.config/metabooks-mcp/.env ou como variáveis de ambiente.\n\n"
+            "Só o transporte stdio é suportado: os transportes HTTP (sse, "
+            "streamable-http) abririam uma porta local sem autenticação alguma, "
+            "dando a qualquer processo da máquina uso pleno das credenciais "
+            "Metabooks configuradas."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--transport",
-        choices=["stdio", "sse", "streamable-http"],
+        choices=["stdio"],
         default="stdio",
-        help="Transporte MCP a usar (padrão: stdio)",
+        help="Transporte MCP a usar (somente stdio; ver descrição acima)",
     )
     args = parser.parse_args()
 
@@ -62,6 +68,7 @@ def main() -> None:
     # de atexit sejam registrados antes de --help sair via sys.exit().
     mcp = FastMCP(
         name="metabooks-mcp",
+        version=__version__,
         instructions=(
             "Servidor MCP somente leitura para a API REST v2 da Metabooks. "
             "Módulos disponíveis: busca de produtos no catálogo bibliográfico (busca booleana, "

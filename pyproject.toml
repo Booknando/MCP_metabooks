@@ -1,21 +1,24 @@
 [project]
 name = "metabooks-mcp"
-version = "2.5.0"
+version = "2.6.0"
 description = "MCP Server para a API REST v2 da Metabooks: metadados bibliográficos, capas, mídias e editoras."
 readme = "README.md"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 requires-python = ">=3.12"
 keywords = ["metabooks", "isbn", "bibliografico", "mcp", "ai", "claude"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: Other/Proprietary License",
+    "Private :: Do Not Upload",
     "Programming Language :: Python :: 3.12",
     "Topic :: Office/Business",
 ]
 dependencies = [
+    # Teto obrigatório: o SDK 2.x removeu `mcp.server.fastmcp` (virou
+    # `mcp.server.mcpserver.MCPServer`) e o servidor não importa sem o teto.
+    "mcp[cli]>=1.26.0,<2",
     "httpx>=0.28.0",
-    "mcp[cli]>=1.26.0",
     "python-dotenv>=1.2.0",
     "pillow>=10.0.0",
 ]
@@ -33,4 +36,10 @@ packages = ["src/metabooks_mcp"]
 [project.optional-dependencies]
 dev = [
     "hatchling>=1.29.0",
+    "pytest>=8.0.0",
+    "anyio>=4.0.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

@@ -3,6 +3,8 @@
 from typing import Annotated
 from mcp.server.fastmcp import FastMCP, Context
 
+from ..client import path_segment
+
 
 def register(mcp: FastMCP) -> None:
 
@@ -13,4 +15,4 @@ def register(mcp: FastMCP) -> None:
     ) -> dict:
         """Recupera dados cadastrais de uma editora: nome, endereço, e-mail, prefixos ISBN, CNPJ."""
         client = ctx.request_context.lifespan_context["metabooks"]
-        return await client.get(f"publisher/{mvb_id}")
+        return await client.get(f"publisher/{path_segment(mvb_id)}")

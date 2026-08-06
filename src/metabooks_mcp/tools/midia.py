@@ -5,7 +5,8 @@ from io import BytesIO
 from typing import Annotated, Optional
 from mcp.server.fastmcp import FastMCP, Context, Image
 
-from ._files import resolve_target
+from ..client import path_segment
+from ._files import DestinationError, allowed_roots, resolve_target
 
 try:  # Pillow é usado para reduzir imagens grandes antes de exibi-las inline.
     from PIL import Image as PILImage
@@ -131,7 +132,7 @@ def _downscale_to_jpeg(data: bytes, max_dim: int = MAX_INLINE_DIMENSION) -> byte
 
 
 async def _list_assets(client, product_id: str) -> list[dict]:
-    data = await client.get(f"asset/mmo/{product_id}", scope="mmo")
+    data = await client.get(f"asset/mmo/{path_segment(product_id)}", scope="mmo")
     return data if isinstance(data, list) else []
 
 
@@ -264,8 +265,15 @@ def register(mcp: FastMCP) -> None:
         index: Annotated[int, "Escolhe entre vários do mesmo tipo (0 = primeiro)."] = 0,
         dest: Annotated[
             Optional[str],
-            "Destino opcional: caminho de arquivo OU pasta. Se omitido, salva em ~/Downloads.",
+            "Destino opcional: caminho de arquivo OU pasta. Precisa estar DENTRO "
+            "das pastas permitidas — por padrão ~/Downloads (ajustável em "
+            "METABOOKS_DOWNLOAD_DIR). Se omitido, salva na pasta permitida padrão.",
         ] = None,
+        overwrite: Annotated[
+            bool,
+            "Se o arquivo já existir, substituir? Padrão false (a gravação falha "
+            "em vez de sobrescrever sem aviso).",
+        ] = False,
     ) -> dict:
         """Baixa uma mídia (capa extra, miolo, sumário PDF, áudio…) e salva em arquivo.
 
@@ -293,10 +301,17 @@ def register(mcp: FastMCP) -> None:
         except Exception as exc:  # noqa: BLE001
             return {"error": f"Não foi possível baixar a mídia ({atype}): {exc}."}
 
-        ext = _ext_from_bytes(data, _ext_from_label(asset.get("label", "")))
+        # O asset cru do listing não traz 'label' (isso é enriquecimento nosso),
+        # então o fallback de extensão vem do mapa de tipos.
+        ext = _ext_from_bytes(data, _ext_from_label(MEDIA_TYPE_LABELS.get(atype, "")))
         resolved_id = _asset_id_of(asset) or f"{atype.lower()}_{asset.get('sequenceNumber') or 0}"
         filename = f"midia_{product_id}_{resolved_id}.{ext}"
-        target = resolve_target(dest, filename)
+        try:
+            target = resolve_target(
+                dest, filename, expected_ext=ext, overwrite=overwrite
+            )
+        except DestinationError as exc:
+            return {"error": str(exc), "pastas_permitidas": allowed_roots()}
         try:
             os.makedirs(os.path.dirname(target), exist_ok=True)
             with open(target, "wb") as fh:

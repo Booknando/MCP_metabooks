@@ -1,0 +1,79 @@
+LICENÇA DE USO — METABOOKS MCP SERVER
+=====================================
+
+Copyright (c) 2026 Booknando Livros. Todos os direitos reservados.
+
+Este software é proprietário da Booknando Livros. Ele NÃO é software livre nem
+de código aberto. A presente licença concede direito de USO apenas, nos termos
+abaixo.
+
+
+1. CONCESSÃO DE USO
+
+A Booknando Livros concede ao destinatário autorizado ("Usuário") uma licença
+pessoal, não exclusiva, não transferível, revogável e limitada para instalar e
+executar este software, em ambiente próprio, com a única finalidade de consultar
+a API REST da Metabooks por meio de credenciais que o próprio Usuário esteja
+contratualmente autorizado a utilizar.
+
+
+2. RESTRIÇÕES
+
+Sem autorização prévia e por escrito da Booknando Livros, é vedado ao Usuário:
+
+   a) copiar, redistribuir, publicar, sublicenciar, vender, alugar, emprestar
+      ou de qualquer forma disponibilizar o software a terceiros;
+   b) modificar, adaptar, traduzir ou criar obras derivadas;
+   c) fazer engenharia reversa, descompilar ou desmontar o software, salvo na
+      medida em que a lei aplicável o permita de forma inafastável;
+   d) remover, alterar ou ocultar avisos de titularidade, copyright ou esta
+      licença;
+   e) utilizar o software para prestar serviço a terceiros, em regime de
+      hospedagem, SaaS ou equivalente.
+
+
+3. TITULARIDADE
+
+O software é licenciado, não vendido. A Booknando Livros conserva a titularidade
+integral sobre o código, sua estrutura, organização e documentação.
+
+
+4. DADOS E API DE TERCEIROS
+
+A API Metabooks e os dados por ela fornecidos pertencem à MVB (Marketing- und
+Verlagsservice des Buchhandels GmbH) e/ou aos respectivos titulares. Esta
+licença não confere qualquer direito sobre essa API ou esses dados. O uso do
+software não substitui nem amplia o contrato do Usuário com a MVB, e permanece
+sujeito integralmente aos termos desse contrato. Cabe exclusivamente ao Usuário
+a guarda de suas credenciais e a observância dos limites de uso contratados.
+
+
+5. AUSÊNCIA DE GARANTIA
+
+O SOFTWARE É FORNECIDO "NO ESTADO EM QUE SE ENCONTRA", SEM GARANTIA DE QUALQUER
+NATUREZA, EXPRESSA OU IMPLÍCITA, INCLUINDO, SEM LIMITAÇÃO, GARANTIAS DE
+COMERCIABILIDADE, ADEQUAÇÃO A UMA FINALIDADE ESPECÍFICA, EXATIDÃO DOS METADADOS
+RETORNADOS E AUSÊNCIA DE VIOLAÇÃO DE DIREITOS.
+
+
+6. LIMITAÇÃO DE RESPONSABILIDADE
+
+NA MÁXIMA EXTENSÃO PERMITIDA PELA LEI APLICÁVEL, A BOOKNANDO LIVROS NÃO
+RESPONDERÁ POR QUAISQUER DANOS DIRETOS, INDIRETOS, INCIDENTAIS, ESPECIAIS,
+CONSEQUENCIAIS OU LUCROS CESSANTES DECORRENTES DO USO OU DA IMPOSSIBILIDADE DE
+USO DO SOFTWARE, AINDA QUE ADVERTIDA DA POSSIBILIDADE DE TAIS DANOS.
+
+
+7. VIGÊNCIA E RESCISÃO
+
+Esta licença vigora enquanto o Usuário a cumprir integralmente. O
+descumprimento de qualquer cláusula acarreta rescisão automática, hipótese em
+que o Usuário deverá cessar o uso e apagar todas as cópias do software.
+
+
+8. LEI APLICÁVEL
+
+Esta licença é regida pelas leis da República Federativa do Brasil.
+
+
+Contato para autorizações: Booknando Livros — contato@booknando.com.br
