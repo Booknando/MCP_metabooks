@@ -400,14 +400,29 @@ def _find_list(data: Any) -> list:
     return []
 
 
+def _first_top_level(data: dict, keys: list[str]) -> Any:
+    """Primeiro valor achado para uma das chaves, SÓ no nível de topo.
+
+    Metadado de paginação nunca mora dentro de um produto. Buscar em profundidade
+    (como o resto do módulo faz para campos bibliográficos) faria um `number`,
+    `size` ou `count` de um registro virar a página/o total da resposta — um
+    número inventado justamente no módulo que existe para não inventar nada.
+    """
+    for key in keys:
+        val = _get_ci(data, key)
+        if val is not None:
+            return val
+    return None
+
+
 def _envelope(data: Any, mostrando: int) -> dict:
     env: dict[str, Any] = {}
     if isinstance(data, dict):
-        total = _deep_get(data, TOTAL_KEYS)
+        total = _first_top_level(data, TOTAL_KEYS)
         env["total"] = total if isinstance(total, (int, float)) else mostrando
         for label, keys in (("pagina", PAGE_KEYS), ("tamanho", SIZE_KEYS),
                             ("total_paginas", TOTAL_PAGES_KEYS)):
-            v = _deep_get(data, keys)
+            v = _first_top_level(data, keys)
             if isinstance(v, (int, float)):
                 # A API é paginada no estilo Spring: o parâmetro `page` é base 1
                 # (ver collection Postman) e o campo `number` da resposta é base 0.

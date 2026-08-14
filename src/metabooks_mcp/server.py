@@ -35,40 +35,21 @@ async def lifespan(server: FastMCP) -> AsyncIterator[dict]:
         await client.aclose()
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        prog="metabooks-mcp",
-        description=(
-            "MCP Server para a API REST v2 da Metabooks.\n\n"
-            "Normalmente invocado pelo Claude Desktop ou outro cliente MCP via stdio.\n\n"
-            "Variáveis de ambiente necessárias:\n"
-            "  METABOOKS_USERNAME / METABOOKS_PASSWORD  — autenticação em produção\n"
-            "  METABOOKS_METADATA_TOKEN                 — token de metadados (staging/rc)\n"
-            "  METABOOKS_COVER_TOKEN                    — token para capas\n"
-            "  METABOOKS_MMO_TOKEN                      — token para mídias (MMO)\n"
-            "  METABOOKS_BASE_URL                       — URL base (opcional, para override)\n"
-            "  METABOOKS_DOWNLOAD_DIR                   — pastas onde downloads podem ser gravados\n\n"
-            "Configure em ~/.config/metabooks-mcp/.env ou como variáveis de ambiente.\n\n"
-            "Só o transporte stdio é suportado: os transportes HTTP (sse, "
-            "streamable-http) abririam uma porta local sem autenticação alguma, "
-            "dando a qualquer processo da máquina uso pleno das credenciais "
-            "Metabooks configuradas."
-        ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument(
-        "--transport",
-        choices=["stdio"],
-        default="stdio",
-        help="Transporte MCP a usar (somente stdio; ver descrição acima)",
-    )
-    args = parser.parse_args()
+def build_server() -> FastMCP:
+    """Monta o servidor MCP completo, com as ferramentas já registradas.
 
-    # FastMCP é criado aqui (não no nível do módulo) para evitar que os handlers
-    # de atexit sejam registrados antes de --help sair via sys.exit().
+    É o ÚNICO lugar que constrói o servidor: os testes e o CI importam esta
+    função em vez de remontar um ``FastMCP`` na mão. Quando remontavam, o
+    caminho real de inicialização ficava sem cobertura — foi assim que um
+    ``FastMCP(version=...)`` inválido passou por uma suíte verde e por um CI
+    verde e só quebrou na máquina de quem instalava.
+    """
+    # ATENÇÃO: `FastMCP.__init__` aceita uma lista FECHADA de parâmetros — não
+    # há `**settings` nem `version`. Passar `version=` aqui levanta TypeError e
+    # o servidor não sobe. A versão é publicada logo abaixo, no servidor de
+    # baixo nível, que é quem monta o handshake.
     mcp = FastMCP(
         name="metabooks-mcp",
-        version=__version__,
         instructions=(
             "Servidor MCP somente leitura para a API REST v2 da Metabooks. "
             "Módulos disponíveis: busca de produtos no catálogo bibliográfico (busca booleana, "
@@ -105,13 +86,51 @@ def main() -> None:
         ),
         lifespan=lifespan,
     )
+    # O FastMCP não repassa versão ao servidor de baixo nível, então o handshake
+    # reportaria a versão do pacote `mcp` em vez da do projeto. `Server.version`
+    # é público e é o que vira `serverInfo.version` no initialize.
+    mcp._mcp_server.version = __version__
+
     produtos.register(mcp)
     capas.register(mcp)
     midia.register(mcp)
     indice.register(mcp)
     editora.register(mcp)
+    return mcp
 
-    mcp.run(transport=args.transport)
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog="metabooks-mcp",
+        description=(
+            "MCP Server para a API REST v2 da Metabooks.\n\n"
+            "Normalmente invocado pelo Claude Desktop ou outro cliente MCP via stdio.\n\n"
+            "Variáveis de ambiente necessárias:\n"
+            "  METABOOKS_USERNAME / METABOOKS_PASSWORD  — autenticação em produção\n"
+            "  METABOOKS_METADATA_TOKEN                 — token de metadados (staging/rc)\n"
+            "  METABOOKS_COVER_TOKEN                    — token para capas\n"
+            "  METABOOKS_MMO_TOKEN                      — token para mídias (MMO)\n"
+            "  METABOOKS_BASE_URL                       — URL base (opcional, para override)\n"
+            "  METABOOKS_DOWNLOAD_DIR                   — pastas onde downloads podem ser gravados\n\n"
+            "Configure em ~/.config/metabooks-mcp/.env ou como variáveis de ambiente.\n\n"
+            "Só o transporte stdio é suportado: os transportes HTTP (sse, "
+            "streamable-http) abririam uma porta local sem autenticação alguma, "
+            "dando a qualquer processo da máquina uso pleno das credenciais "
+            "Metabooks configuradas."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--transport",
+        choices=["stdio"],
+        default="stdio",
+        help="Transporte MCP a usar (somente stdio; ver descrição acima)",
+    )
+    args = parser.parse_args()
+
+    # O servidor é construído aqui (não no nível do módulo) para que --help saia
+    # pelo argparse sem pagar o custo — e sem registrar handlers de atexit.
+    build_server().run(transport=args.transport)
 
 
 if __name__ == "__main__":

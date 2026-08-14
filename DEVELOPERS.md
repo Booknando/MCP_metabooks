@@ -27,6 +27,7 @@ metabooks-mcp/
 │   ├── test_compact.py     # projeção compacta, titulo_exato, envelope
 │   ├── test_files.py       # confinamento de destino, sobrescrita, extensão
 │   ├── test_api_contract.py# MCP × collection Postman oficial
+│   ├── test_server.py      # build_server(): construção, versão no handshake, schema
 │   ├── test_live.py        # as 12 tools contra a API REAL (só com METABOOKS_LIVE=1)
 │   └── fixtures/           # Metabooks.postman_collection.json (spec executável da MVB)
 ├── scripts/
@@ -48,9 +49,48 @@ removeu `mcp.server.fastmcp` (a classe virou `mcp.server.mcpserver.MCPServer`), 
 sem ele um `pip install` limpo resolve para 2.x e o servidor falha na importação
 com `ModuleNotFoundError: No module named 'mcp.server.fastmcp'` — o entry point
 nem chega a subir. O job `resolucao-de-dependencias` do CI reproduz o caminho do
-README (`pip install .` + `metabooks-mcp --help`) exatamente para pegar essa
+README (`pip install .` + construção do servidor) exatamente para pegar essa
 regressão. Migrar para o SDK 2.x é uma tarefa separada, não uma consequência de
 soltar o teto.
+
+O teto sozinho não basta: **a assinatura do `FastMCP.__init__` também muda dentro
+do 1.x**. Até a 2.6.0 o servidor era construído com `FastMCP(version=...)`, que
+versões antigas do SDK engoliam via `**settings` e as atuais recusam — o
+resultado era `TypeError: FastMCP.__init__() got an unexpected keyword argument
+'version'` na instalação de quem baixava o ZIP, com a suíte e o CI verdes. Por
+isso o job de instalação limpa roda em matriz nas **duas pontas** do teto
+(`1.26.0` e a resolvida) e **constrói o servidor de verdade**, em vez de só
+chamar `--help`. Ao mexer no construtor, confira as duas pontas.
+
+## `build_server()` é o único construtor
+
+`server.py` expõe `build_server() -> FastMCP`; `main()` só faz o argparse e chama
+`build_server().run(...)`. Testes (`conftest.py`, `test_live.py`) e CI importam
+essa função.
+
+**Não remonte um `FastMCP` na mão em teste nenhum.** Foi exatamente isso que
+escondeu o defeito acima: a suíte montava o seu próprio servidor (sem o
+`version=`), então 142 testes passavam sobre um objeto que não era o objeto
+distribuído. Toda prova de inicialização tem de partir de `build_server()`.
+
+A versão do projeto é publicada em `mcp._mcp_server.version` logo após a
+construção — o `FastMCP` não repassa versão ao servidor de baixo nível, e sem
+isso o `initialize` devolveria a versão do pacote `mcp`.
+
+### Descrições de parâmetro: sempre via `Field`
+
+Use `Annotated[X, Field(description="...")]`, nunca `Annotated[X, "texto"]`. O
+pydantic trata a string pura como metadado desconhecido e a **descarta** ao gerar
+o JSON Schema: a descrição não chega ao modelo e nada quebra. Até a 2.6.0 apenas
+4 dos 41 parâmetros chegavam documentados — inclusive a `SEARCH_SYNTAX`, que
+sumia do parâmetro `search`. `test_server.py` tranca isso exigindo `description`
+em todos os parâmetros de todas as tools.
+
+### Ruído conhecido no stderr
+
+Ao construir o servidor, o SDK emite um `IncompleteFieldDefinitionWarning` do
+`pydantic_settings` sobre o campo `lifespan`. É interno do SDK (aparece até num
+`FastMCP(name='x')` puro), vai para o log do Claude Desktop e não indica falha.
 
 ## Cobertura da API REST v2
 
@@ -242,8 +282,20 @@ da MVB, substitua o arquivo e rode a suíte: as divergências aparecem como falh
 
 `.github/workflows/ci.yml` roda a suíte em Ubuntu/Windows/macOS × Python
 3.12/3.13, e tem um job separado (`resolucao-de-dependencias`) que faz
-`pip install .` + `metabooks-mcp --help` numa árvore limpa — é a guarda contra a
-regressão do teto do SDK `mcp` descrita acima.
+`pip install .` numa árvore limpa, em matriz nas duas pontas do teto do SDK
+(`1.26.0` e a resolvida) — é a guarda contra as regressões de dependência
+descritas acima.
+
+Os dois jobs constroem o servidor de verdade:
+
+```yaml
+run: python -c "from metabooks_mcp.server import build_server; build_server()"
+```
+
+Essa linha é a que importa. `metabooks-mcp --help` continua no CI, mas **não
+prova inicialização**: o argparse trata o `--help` e sai antes da construção do
+servidor. Quando o CI só tinha o `--help`, um construtor inválido passou por ele
+sem arranhão.
 
 A rodada ao vivo (abaixo) **não** entra no CI: exige credenciais de produção e
 consome um slot de sessão paralela da MVB a cada execução.

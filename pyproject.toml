@@ -1,9 +1,10 @@
 [project]
 name = "metabooks-mcp"
-version = "2.6.0"
+version = "2.7.0"
 description = "MCP Server para a API REST v2 da Metabooks: metadados bibliográficos, capas, mídias e editoras."
 readme = "README.md"
 license = { file = "LICENSE" }
+authors = [{ name = "Booknando Livros" }]
 requires-python = ">=3.12"
 keywords = ["metabooks", "isbn", "bibliografico", "mcp", "ai", "claude"]
 classifiers = [
@@ -22,6 +23,11 @@ dependencies = [
     "python-dotenv>=1.2.0",
     "pillow>=10.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Booknando/MCP_metabooks"
+Repository = "https://github.com/Booknando/MCP_metabooks"
+Issues = "https://github.com/Booknando/MCP_metabooks/issues"
 
 [project.scripts]
 metabooks-mcp = "metabooks_mcp.server:main"
