@@ -72,7 +72,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def metabooks_search_products(
         ctx: Context,
-        search: Annotated[str, SEARCH_SYNTAX],
+        search: Annotated[str, Field(description=SEARCH_SYNTAX)],
         page: Annotated[int, Field(ge=1, description="Página, base 1 (padrão 1)")] = 1,
         size: Annotated[
             int,
@@ -83,10 +83,16 @@ def register(mcp: FastMCP) -> None:
             "identifier", "author", "titleAndSubtitle", "publisher",
             "publicationDate", "productAvailability", "price",
             "creationDate", "lastModificationDate", "productType", "active",
-        ]], "Coluna de ordenação (opcional)"] = None,
-        direction: Annotated[Optional[Literal["asc", "desc"]], "Direção de ordenação"] = None,
-        active: Annotated[Optional[bool], "true=ativos, false=inativos; omitido=ambos"] = None,
-        view: Annotated[Literal["compact", "full"], _VIEW_LIST] = "compact",
+        ]], Field(description="Coluna de ordenação (opcional)")] = None,
+        direction: Annotated[
+            Optional[Literal["asc", "desc"]],
+            Field(description="Direção de ordenação"),
+        ] = None,
+        active: Annotated[
+            Optional[bool],
+            Field(description="true=ativos, false=inativos; omitido=ambos"),
+        ] = None,
+        view: Annotated[Literal["compact", "full"], Field(description=_VIEW_LIST)] = "compact",
     ) -> dict:
         """Busca títulos no catálogo Metabooks por palavra-chave ou expressão booleana.
 
@@ -121,15 +127,18 @@ def register(mcp: FastMCP) -> None:
                   description=f"Lista de ISBNs/GTINs (até {MAX_BULK_ISBNS}). "
                               "Curingas '*' aceitos (ex: '9783923*')"),
         ],
-        search: Annotated[Optional[str], "Filtro booleano adicional opcional — mesma "
-                              "sintaxe de metabooks_search_products (ex.: 'AD=20240101^20241231', 'PF=E*')"] = None,
+        search: Annotated[
+            Optional[str],
+            Field(description="Filtro booleano adicional opcional — mesma sintaxe de "
+                              "metabooks_search_products (ex.: 'AD=20240101^20241231', 'PF=E*')"),
+        ] = None,
         page: Annotated[int, Field(ge=1, description="Página, base 1 (padrão 1)")] = 1,
         size: Annotated[
             int,
             Field(ge=1, le=MAX_PAGE_SIZE,
                   description=f"Itens por página, 1-{MAX_PAGE_SIZE} (padrão 50)"),
         ] = 50,
-        view: Annotated[Literal["compact", "full"], _VIEW_LIST] = "compact",
+        view: Annotated[Literal["compact", "full"], Field(description=_VIEW_LIST)] = "compact",
     ) -> dict:
         """Consulta vários ISBNs/GTINs de uma vez (até 500). ISBNs sem correspondência não aparecem."""
         client = ctx.request_context.lifespan_context["metabooks"]
@@ -147,20 +156,25 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def metabooks_get_product(
         ctx: Context,
-        id: Annotated[str, "UUID (32 chars), ISBN-13, EAN ou GTIN (não hifenizado)"],
+        id: Annotated[
+            str,
+            Field(description="UUID (32 chars), ISBN-13, EAN ou GTIN (não hifenizado)"),
+        ],
         id_type: Annotated[
             Literal["uuid", "isbn13", "ean", "gtin"],
-            "Tipo do ID: uuid (padrão), isbn13, ean ou gtin",
+            Field(description="Tipo do ID: uuid (padrão), isbn13, ean ou gtin"),
         ] = "uuid",
         format: Annotated[
             Literal["json", "onix30-short", "onix30-ref"],
-            "Formato: json (padrão, completo), onix30-short ou onix30-ref (XML ONIX 3.0)",
+            Field(description="Formato: json (padrão, completo), onix30-short ou "
+                              "onix30-ref (XML ONIX 3.0)"),
         ] = "json",
         view: Annotated[
             Literal["compact", "full"],
-            "Só para format=json. compact (padrão): identificação amigável + "
-            "descrição truncada + demais campos reduzidos (evita despejar todos "
-            "os blocos ONIX). full: JSON completo e cru da API.",
+            Field(description="Só para format=json. compact (padrão): identificação "
+                              "amigável + descrição truncada + demais campos reduzidos "
+                              "(evita despejar todos os blocos ONIX). full: JSON completo "
+                              "e cru da API."),
         ] = "compact",
     ) -> dict | str:
         """Recupera os dados de um único título.
@@ -190,7 +204,7 @@ def register(mcp: FastMCP) -> None:
                               "Ordem preservada. NÃO aceita ISBN — use "
                               "metabooks_batch_search_isbns para ISBNs."),
         ],
-        view: Annotated[Literal["compact", "full"], _VIEW_LIST] = "compact",
+        view: Annotated[Literal["compact", "full"], Field(description=_VIEW_LIST)] = "compact",
     ) -> dict:
         """Recupera os dados de vários produtos de uma vez a partir de UUIDs."""
         client = ctx.request_context.lifespan_context["metabooks"]

@@ -4,6 +4,7 @@ import os
 from io import BytesIO
 from typing import Annotated, Optional
 from mcp.server.fastmcp import FastMCP, Context, Image
+from pydantic import Field
 
 from ..client import path_segment
 from ._files import DestinationError, allowed_roots, resolve_target
@@ -48,6 +49,17 @@ IMAGE_TYPES: frozenset[str] = frozenset(
 # Claude Desktop, reduzimos o lado maior a este limite e recomprimimos em JPEG.
 MAX_INLINE_DIMENSION = 1024
 JPEG_QUALITY = 85
+
+# Descrições reaproveitadas pelos parâmetros que se repetem nas três tools.
+_PRODUCT_ID_DESC = "UUID do produto (32 chars)"
+_ASSET_ID_DESC = (
+    "ID do arquivo (campo asset_id de metabooks_get_media_assets). "
+    "Tem prioridade sobre media_type/index."
+)
+_INDEX_DESC = (
+    "Quando há vários do mesmo tipo (ex.: amostras do miolo), escolhe pela ordem "
+    "de sequência (0 = primeira)."
+)
 
 
 def _asset_id_of(asset: dict) -> Optional[str]:
@@ -141,10 +153,11 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def metabooks_get_media_assets(
         ctx: Context,
-        product_id: Annotated[str, "UUID do produto (32 chars)"],
+        product_id: Annotated[str, Field(description=_PRODUCT_ID_DESC)],
         type_filter: Annotated[
             Optional[str],
-            "Filtra por tipo de mídia (ex.: FRONTCOVER, TABLE_OF_CONTENT, TEXT_SAMPLE_CONTENT)",
+            Field(description="Filtra por tipo de mídia (ex.: FRONTCOVER, "
+                              "TABLE_OF_CONTENT, TEXT_SAMPLE_CONTENT)"),
         ] = None,
     ) -> dict:
         """Lista as mídias de um produto (capas, sumário, amostras). Exige METABOOKS_MMO_TOKEN.
@@ -185,21 +198,14 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def metabooks_view_media_asset(
         ctx: Context,
-        product_id: Annotated[str, "UUID do produto (32 chars)"],
-        asset_id: Annotated[
-            Optional[str],
-            "ID do arquivo (campo asset_id de metabooks_get_media_assets). "
-            "Tem prioridade sobre media_type/index.",
-        ] = None,
+        product_id: Annotated[str, Field(description=_PRODUCT_ID_DESC)],
+        asset_id: Annotated[Optional[str], Field(description=_ASSET_ID_DESC)] = None,
         media_type: Annotated[
             Optional[str],
-            "Tipo da mídia (ex.: BACKCOVER, IMAGE_SAMPLE_CONTENT) quando não se passa asset_id.",
+            Field(description="Tipo da mídia (ex.: BACKCOVER, IMAGE_SAMPLE_CONTENT) "
+                              "quando não se passa asset_id."),
         ] = None,
-        index: Annotated[
-            int,
-            "Quando há vários do mesmo tipo (ex.: amostras do miolo), escolhe pela ordem "
-            "de sequência (0 = primeira).",
-        ] = 0,
+        index: Annotated[int, Field(description=_INDEX_DESC)] = 0,
     ):
         """Exibe uma imagem de mídia (quarta capa, miolo, foto do autor) inline na conversa.
 
@@ -252,27 +258,28 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def metabooks_download_media_asset(
         ctx: Context,
-        product_id: Annotated[str, "UUID do produto (32 chars)"],
-        asset_id: Annotated[
-            Optional[str],
-            "ID do arquivo (campo asset_id de metabooks_get_media_assets). "
-            "Tem prioridade sobre media_type/index.",
-        ] = None,
+        product_id: Annotated[str, Field(description=_PRODUCT_ID_DESC)],
+        asset_id: Annotated[Optional[str], Field(description=_ASSET_ID_DESC)] = None,
         media_type: Annotated[
             Optional[str],
-            "Tipo da mídia (ex.: TABLE_OF_CONTENT, AUDIO_SAMPLE_CONTENT) quando não se passa asset_id.",
+            Field(description="Tipo da mídia (ex.: TABLE_OF_CONTENT, "
+                              "AUDIO_SAMPLE_CONTENT) quando não se passa asset_id."),
         ] = None,
-        index: Annotated[int, "Escolhe entre vários do mesmo tipo (0 = primeiro)."] = 0,
+        index: Annotated[
+            int,
+            Field(description="Escolhe entre vários do mesmo tipo (0 = primeiro)."),
+        ] = 0,
         dest: Annotated[
             Optional[str],
-            "Destino opcional: caminho de arquivo OU pasta. Precisa estar DENTRO "
-            "das pastas permitidas — por padrão ~/Downloads (ajustável em "
-            "METABOOKS_DOWNLOAD_DIR). Se omitido, salva na pasta permitida padrão.",
+            Field(description="Destino opcional: caminho de arquivo OU pasta. Precisa "
+                              "estar DENTRO das pastas permitidas — por padrão "
+                              "~/Downloads (ajustável em METABOOKS_DOWNLOAD_DIR). Se "
+                              "omitido, salva na pasta permitida padrão."),
         ] = None,
         overwrite: Annotated[
             bool,
-            "Se o arquivo já existir, substituir? Padrão false (a gravação falha "
-            "em vez de sobrescrever sem aviso).",
+            Field(description="Se o arquivo já existir, substituir? Padrão false (a "
+                              "gravação falha em vez de sobrescrever sem aviso)."),
         ] = False,
     ) -> dict:
         """Baixa uma mídia (capa extra, miolo, sumário PDF, áudio…) e salva em arquivo.

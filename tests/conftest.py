@@ -74,12 +74,16 @@ def downloads(tmp_path, monkeypatch) -> Path:
 
 @asynccontextmanager
 async def _mcp_session(api, monkeypatch, *, media_tokens: bool):
-    """Monta o servidor como o ``main()`` monta e conecta um cliente em memória.
+    """Usa o servidor DO PACOTE e conecta um cliente em memória.
 
-    Exercita o caminho real: lifespan, registro das tools no FastMCP, validação
-    de schema dos argumentos pelo SDK e serialização do resultado.
+    Exercita o caminho real: construção do FastMCP, lifespan, registro das tools,
+    validação de schema dos argumentos pelo SDK e serialização do resultado.
+
+    Chamar ``build_server()`` aqui — em vez de remontar um ``FastMCP`` na mão — é
+    deliberado: enquanto a suíte montava o seu próprio servidor, um argumento
+    inválido no construtor do servidor de verdade passava por 142 testes verdes e
+    só aparecia na máquina de quem instalava.
     """
-    from mcp.server.fastmcp import FastMCP
     from mcp.shared.memory import create_connected_server_and_client_session
 
     monkeypatch.setenv("METABOOKS_USERNAME", LOGIN_USERNAME)
@@ -101,12 +105,9 @@ async def _mcp_session(api, monkeypatch, *, media_tokens: bool):
 
     monkeypatch.setattr(MetabooksClient, "__init__", patched_init)
 
-    from metabooks_mcp.server import lifespan
-    from metabooks_mcp.tools import capas, editora, indice, midia, produtos
+    from metabooks_mcp.server import build_server
 
-    mcp = FastMCP(name="metabooks-mcp-test", instructions="teste", lifespan=lifespan)
-    for module in (produtos, capas, midia, indice, editora):
-        module.register(mcp)
+    mcp = build_server()
 
     async with create_connected_server_and_client_session(mcp._mcp_server) as s:
         yield s

@@ -31,15 +31,27 @@ jobs:
       - name: Instalar o pacote e as dependências de teste
         run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
 
-      - name: Conferir se o servidor sobe
+      - name: Conferir o entry point
         run: metabooks-mcp --help
+
+      # O --help sai pelo argparse ANTES de construir o servidor, então sozinho
+      # ele não prova nada sobre a inicialização. Esta é a checagem que prova.
+      - name: O servidor tem de CONSTRUIR
+        run: python -c "from metabooks_mcp.server import build_server; build_server()"
 
       - name: Rodar a suíte
         run: python -m pytest -q
 
   resolucao-de-dependencias:
-    name: Instalação limpa (protege o teto do SDK mcp)
+    name: Instalação limpa, SDK ${{ matrix.sdk }} (protege o teto do mcp)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # As duas pontas do teto declarado em pyproject.toml. A assinatura do
+        # `FastMCP.__init__` já mudou entre versões 1.x e derrubou o servidor na
+        # instalação de quem usava; testar só uma ponta esconde exatamente isso.
+        sdk: ["resolvida", "1.26.0"]
     steps:
       - uses: actions/checkout@v4
 
@@ -53,8 +65,28 @@ jobs:
       - name: Instalar como o usuário final instala
         run: python -m pip install .
 
+      - name: Fixar o piso do teto do SDK
+        if: matrix.sdk != 'resolvida'
+        run: python -m pip install "mcp[cli]==${{ matrix.sdk }}"
+
       - name: O entry point tem de funcionar
         run: metabooks-mcp --help
+
+      # A prova que faltava: `--help` sai pelo argparse antes da construção do
+      # FastMCP, então um argumento inválido no construtor passava batido aqui e
+      # só quebrava na máquina de quem instalava.
+      - name: O servidor tem de CONSTRUIR e registrar as 12 tools
+        run: |
+          python - <<'PY'
+          import anyio
+          from metabooks_mcp import __version__
+          from metabooks_mcp.server import build_server
+          mcp = build_server()
+          tools = anyio.run(mcp.list_tools)
+          assert len(tools) == 12, f"esperava 12 tools, achei {len(tools)}"
+          assert mcp._mcp_server.version == __version__
+          print(f"OK: metabooks-mcp {__version__} com {len(tools)} tools")
+          PY
 
       - name: Registrar a versão do SDK resolvida
         run: python -c "from importlib.metadata import version; print('mcp', version('mcp'))"

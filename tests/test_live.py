@@ -67,19 +67,17 @@ async def live(monkeypatch, tmp_path):
     )):
         pytest.skip("sem credenciais de metadados no ambiente")
 
-    from mcp.server.fastmcp import FastMCP
     from mcp.shared.memory import create_connected_server_and_client_session
 
-    from metabooks_mcp.server import lifespan
-    from metabooks_mcp.tools import _files, capas, editora, indice, midia, produtos
+    from metabooks_mcp.server import build_server
+    from metabooks_mcp.tools import _files
 
     destino = tmp_path / "downloads"
     destino.mkdir()
     monkeypatch.setenv(_files.ENV_DOWNLOAD_DIR, str(destino))
 
-    mcp = FastMCP(name="metabooks-mcp-live", instructions="ao vivo", lifespan=lifespan)
-    for module in (produtos, capas, midia, indice, editora):
-        module.register(mcp)
+    # O servidor DO PACOTE, igual ao que o Claude Desktop inicia.
+    mcp = build_server()
 
     async with create_connected_server_and_client_session(mcp._mcp_server) as s:
         s._pasta_downloads = destino  # type: ignore[attr-defined]

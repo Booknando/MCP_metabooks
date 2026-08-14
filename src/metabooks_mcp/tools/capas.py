@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Annotated, Literal
 from mcp.server.fastmcp import FastMCP, Context, Image
+from pydantic import Field
 
 from ..client import path_segment
 from ._files import DestinationError, allowed_roots, resolve_target
@@ -34,12 +35,16 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(meta=cover_meta)
     async def metabooks_view_cover(
         ctx: Context,
-        id: Annotated[str, "ISBN-13 ou GTIN, NÃO hifenizado (ex.: 9788530951382)"],
+        id: Annotated[
+            str,
+            Field(description="ISBN-13 ou GTIN, NÃO hifenizado (ex.: 9788530951382)"),
+        ],
         size: Annotated[
             Literal["s", "m", "l"],
-            "Tamanho para exibição: s (90px larg.), m (200px) ou l (599px alt.). "
-            "Não há 'original' aqui — para a capa em tamanho original use "
-            "metabooks_download_cover (salva em arquivo).",
+            Field(description="Tamanho para exibição: s (90px larg.), m (200px) ou "
+                              "l (599px alt.). Não há 'original' aqui — para a capa em "
+                              "tamanho original use metabooks_download_cover (salva em "
+                              "arquivo)."),
         ] = "m",
     ):
         """Exibe a capa de um título por ISBN/GTIN inline na conversa (JPEG).
@@ -79,23 +84,28 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def metabooks_download_cover(
         ctx: Context,
-        id: Annotated[str, "ISBN-13 ou GTIN, NÃO hifenizado (ex.: 9788530951382)"],
+        id: Annotated[
+            str,
+            Field(description="ISBN-13 ou GTIN, NÃO hifenizado (ex.: 9788530951382)"),
+        ],
         size: Annotated[
             Literal["s", "m", "l", "original"],
-            "Tamanho a baixar. 'original' = pixels originais (web-optimized), "
-            "padrão para download; s/m/l reduzem proporcionalmente.",
+            Field(description="Tamanho a baixar. 'original' = pixels originais "
+                              "(web-optimized), padrão para download; s/m/l reduzem "
+                              "proporcionalmente."),
         ] = "original",
         dest: Annotated[
             str | None,
-            "Destino opcional: caminho de um arquivo .jpg OU uma pasta (o nome do "
-            "arquivo é gerado). Precisa estar DENTRO das pastas permitidas — por "
-            "padrão ~/Downloads (ajustável em METABOOKS_DOWNLOAD_DIR). Se omitido, "
-            "salva na pasta permitida padrão.",
+            Field(description="Destino opcional: caminho de um arquivo .jpg OU uma pasta "
+                              "(o nome do arquivo é gerado). Precisa estar DENTRO das "
+                              "pastas permitidas — por padrão ~/Downloads (ajustável em "
+                              "METABOOKS_DOWNLOAD_DIR). Se omitido, salva na pasta "
+                              "permitida padrão."),
         ] = None,
         overwrite: Annotated[
             bool,
-            "Se o arquivo já existir, substituir? Padrão false (a gravação falha "
-            "em vez de sobrescrever sem aviso).",
+            Field(description="Se o arquivo já existir, substituir? Padrão false (a "
+                              "gravação falha em vez de sobrescrever sem aviso)."),
         ] = False,
     ) -> dict:
         """Baixa a capa e salva em arquivo no disco; retorna o caminho.
@@ -157,10 +167,13 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def metabooks_get_cover_url(
         ctx: Context,
-        id: Annotated[str, "ISBN-13 ou GTIN, NÃO hifenizado (ex.: 9783411046508)"],
+        id: Annotated[
+            str,
+            Field(description="ISBN-13 ou GTIN, NÃO hifenizado (ex.: 9783411046508)"),
+        ],
         size: Annotated[
             Literal["s", "m", "l", "original"],
-            "Tamanho: s (90px larg.), m (200px), l (599px alt.) ou original",
+            Field(description="Tamanho: s (90px larg.), m (200px), l (599px alt.) ou original"),
         ] = "m",
     ) -> dict:
         """Monta a URL canônica de capa de um título por ISBN/GTIN.

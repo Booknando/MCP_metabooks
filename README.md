@@ -163,6 +163,18 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 - Verifique se o `pip install` foi concluído sem erros.
 - Confirme que o `claude_desktop_config.json` foi salvo corretamente (sem erros de vírgula ou aspas).
 - Reinicie o Claude Desktop completamente (fechar pela bandeja, não só minimizar).
+- **Se você instalou uma versão anterior à 2.7.0, atualize.** As versões até a 2.6.0 travavam ao iniciar com as versões recentes do SDK MCP (o log mostra `TypeError: FastMCP.__init__() got an unexpected keyword argument 'version'`), e o servidor simplesmente não subia. Refaça o Passo 2 com o ZIP novo.
+
+**Como saber se o servidor está falhando ao iniciar**
+
+Abra o log em `%APPDATA%\Roaming\Claude\logs\mcp-server-metabooks.log` (no Mac, `~/Library/Logs/Claude/mcp-server-metabooks.log`). Se houver um `Traceback` do Python no fim do arquivo, o servidor morreu antes de se conectar — a mensagem da última linha diz o motivo. Um teste direto, fora do Claude Desktop:
+
+```
+metabooks-mcp --help
+python -c "from metabooks_mcp.server import build_server; build_server()"
+```
+
+O primeiro comando confirma que o executável está no lugar; o **segundo** é o que realmente constrói o servidor. Se o segundo falhar, o Claude Desktop também vai falhar.
 
 **Erro: "metabooks-mcp não foi reconhecido"**
 - O Python não está no PATH ou a instalação via pip falhou.
@@ -226,7 +238,7 @@ Para confirmar a recuperação, veja `%APPDATA%\Roaming\Claude\logs\cowork_vm_no
 
 **"Como sei qual cópia do MCP o Claude está usando?"**
 
-Abra `%APPDATA%\Roaming\Claude\logs\mcp-server-metabooks.log` e procure a linha `Using MCP server command:` — ela mostra o caminho do executável realmente iniciado. Se você instalou o `metabooks-mcp` em mais de um ambiente Python, podem existir cópias diferentes; garanta que o `claude_desktop_config.json` aponta para a correta. (Observação: a versão mostrada no handshake é a do SDK MCP, não a do projeto.)
+Abra `%APPDATA%\Roaming\Claude\logs\mcp-server-metabooks.log` e procure a linha `Using MCP server command:` — ela mostra o caminho do executável realmente iniciado. Se você instalou o `metabooks-mcp` em mais de um ambiente Python, podem existir cópias diferentes; garanta que o `claude_desktop_config.json` aponta para a correta. A partir da 2.7.0 o próprio handshake informa a versão do servidor (antes ele mostrava a versão do SDK MCP); para conferir pela linha de comando, rode `pip show metabooks-mcp`.
 
 ---
 

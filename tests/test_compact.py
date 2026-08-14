@@ -156,6 +156,25 @@ def test_lista_nua_sem_envelope():
     assert out["total"] == 1 and out["resultados"][0]["titulo"] == "X"
 
 
+def test_paginacao_nao_vem_de_dentro_de_um_produto():
+    """Metadado de paginação só pode sair do nível de topo da resposta.
+
+    Um produto pode ter `number` (número na série), `size` (tamanho do arquivo) e
+    `count` — buscar em profundidade transformaria esses valores em página/total
+    e o modelo reportaria uma paginação inventada.
+    """
+    data = {
+        "content": [
+            {"id": "1" * 32, "title": "X", "number": 7, "size": 99, "count": 42, "total": 500},
+        ],
+    }
+    out = compact_search(data, None)
+    assert out["total"] == 1, "o total tem de cair no fallback (itens mostrados)"
+    assert out["mostrando"] == 1
+    assert "pagina" not in out and "tamanho" not in out
+    assert "aviso_paginacao" not in out
+
+
 # --- detalhe ----------------------------------------------------------------
 
 def test_detalhe_trunca_descricao():
