@@ -154,6 +154,25 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 - Verifique se o `pip install` foi concluído sem erros.
 - Confirme que o `claude_desktop_config.json` foi salvo corretamente (sem erros de vírgula ou aspas). Você pode validar o JSON rodando `python3.13 -m json.tool ~/Library/Application\ Support/Claude/claude_desktop_config.json` no Terminal; se ele reimprimir o conteúdo sem erro, está válido.
 - Reinicie o Claude Desktop completamente com Cmd + Q (fechar a janela não basta).
+- **Se você instalou uma versão anterior à 2.7.0, atualize.** As versões até a 2.6.0 travavam ao iniciar com as versões recentes do SDK MCP (o log mostra `TypeError: FastMCP.__init__() got an unexpected keyword argument 'version'`), e o servidor simplesmente não subia. Refaça o Passo 2 com o ZIP novo.
+
+**Como saber se o servidor está falhando ao iniciar**
+
+O log fica em `~/Library/Logs/Claude/mcp-server-metabooks.log`. Para abrir as últimas linhas no Terminal:
+```
+tail -n 40 ~/Library/Logs/Claude/mcp-server-metabooks.log
+```
+Se houver um `Traceback` do Python no fim do arquivo, o servidor morreu antes de se conectar, e a última linha diz o motivo.
+
+Para testar fora do Claude Desktop (troque `3.13` pela sua versão e o caminho pelo que você guardou no Passo 2):
+```
+/Library/Frameworks/Python.framework/Versions/3.13/bin/metabooks-mcp --help
+python3.13 -c "from metabooks_mcp.server import build_server; build_server()"
+```
+
+O primeiro comando confirma que o executável está instalado. O **segundo** é o que realmente constrói o servidor: o `--help` sai antes disso e passa mesmo quando a inicialização está quebrada. Se o segundo falhar, o Claude Desktop também vai falhar.
+
+Se o segundo comando responder `ImportError: cannot import name 'build_server'`, a resposta já é o diagnóstico: você está numa versão anterior à 2.7.0, que é a que trava ao iniciar. Atualize.
 
 **Erro: "metabooks-mcp: command not found" no Terminal**
 - Isso é esperado no Mac, já que o script não fica no PATH por padrão. Use sempre o caminho completo (ex.: `/Library/Frameworks/Python.framework/Versions/3.13/bin/metabooks-mcp`).
@@ -179,7 +198,8 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 | Busca em lote de ISBNs | Consulta até 500 ISBNs de uma vez |
 | Detalhes de um livro | Retorna os metadados de um título — resumido (padrão) ou completo (JSON ou ONIX 3.0) |
 | Detalhes de vários livros | Consulta vários UUIDs ao mesmo tempo |
-| Visualizar capa | Exibe a imagem da capa direto na conversa (exige token de capa) |
+| Visualizar capa | Exibe a imagem da capa direto na conversa, em tamanho leve (exige token de capa) |
+| Baixar capa | Salva a capa em `~/Downloads` — use para o tamanho original (exige token de capa) |
 | URL da capa | Retorna o link direto para a imagem da capa (uso autenticado; não abre no navegador) |
 | Listar mídias | Lista as mídias do título (quarta capa, miolo, sumário, foto do autor) |
 | Visualizar mídia | Exibe uma imagem de mídia (quarta capa, miolo, foto do autor) direto na conversa |
@@ -201,7 +221,9 @@ Você pode pedir ao Claude em linguagem natural. Se quiser usar a sintaxe avanç
 | Somente e-books | `PF=E*` |
 | Por palavra-chave | `SW=programação` |
 | Por faixa de preço | `PR=40^80` |
+| Por ano de publicação | `EJ=2020` |
 | Por data de atualização | `AD=20240101^20241231` |
+| Por ID de série | `RH=AAABX01` |
 
 Combine com `and`, `or`, `not` e parênteses. Exemplo: `VL=Novatec and PF=E*` (e-books da Novatec).
 
@@ -213,7 +235,11 @@ As ferramentas de capa e mídia/MMO precisam de tokens separados. Se a MVB forne
 "METABOOKS_MMO_TOKEN": "seu_token_de_mmo"
 ```
 
-Com o token de capa configurado, peça por exemplo "mostre a capa do ISBN 9788530951382" e o Claude exibe a imagem direto na conversa.
+Com o token de capa configurado, peça por exemplo "mostre a capa do ISBN 9788530951382" e o Claude exibe a imagem direto na conversa (a capa é baixada e devolvida como imagem, o token nunca aparece numa URL).
+
+Para exibição, o tamanho é gerenciado automaticamente (versões leves, que sempre renderizam inline). A capa em **tamanho original** (~1,3 MB) não aparece bem inline em alguns clientes: para ela, peça "baixe a capa original do ISBN 9788530951382" e o Claude salva o arquivo em `~/Downloads`.
+
+Com o token de MMO, o Claude também acessa as demais mídias do título (quarta capa, amostras do miolo, foto do autor, sumário em PDF). Peça "mostre a quarta capa" e a imagem aparece inline; para arquivos que não são imagem, ou para a imagem em resolução original, peça "baixe o sumário" e o Claude salva em disco.
 
 ## Ambientes disponíveis
 
@@ -236,7 +262,12 @@ URLs disponíveis:
 ```
 python3.13 -m pip install --upgrade ~/Downloads/MCP_metabooks-main
 ```
-3. Reinicie o Claude Desktop (Cmd + Q e abrir de novo).
+3. Confirme que a versão nova ficou instalada:
+```
+python3.13 -m pip show metabooks-mcp
+```
+A linha `Version:` tem de mostrar a versão que você acabou de baixar. Se mostrar a antiga, o `pip install` apontou para a pasta errada — confira o caminho.
+4. Reinicie o Claude Desktop (Cmd + Q e abrir de novo).
 
 Não é necessário alterar o `claude_desktop_config.json`, a configuração continua valendo, a menos que o caminho do executável tenha mudado (confira com o mesmo comando do Passo 2, item 5).
 

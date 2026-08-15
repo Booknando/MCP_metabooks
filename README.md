@@ -176,6 +176,8 @@ python -c "from metabooks_mcp.server import build_server; build_server()"
 
 O primeiro comando confirma que o executável está no lugar; o **segundo** é o que realmente constrói o servidor. Se o segundo falhar, o Claude Desktop também vai falhar.
 
+Se o segundo comando responder `ImportError: cannot import name 'build_server'`, a resposta já é o diagnóstico: você está numa versão anterior à 2.7.0, que é a que trava ao iniciar. Atualize.
+
 **Erro: "metabooks-mcp não foi reconhecido"**
 - O Python não está no PATH ou a instalação via pip falhou.
 - Reinstale o Python marcando "Add Python to PATH" e tente o `pip install` novamente.
@@ -332,7 +334,12 @@ URLs disponíveis:
 1. Baixe o novo ZIP do repositório (mesmo processo do Passo 2)
 2. Extraia e substitua os arquivos em `C:\Metabooks-mcp`
 3. Execute novamente: `pip install C:\Metabooks-mcp`
-4. Reinicie o Claude Desktop
+4. Confirme que a versão nova ficou instalada:
+   ```
+   pip show metabooks-mcp
+   ```
+   A linha `Version:` tem de mostrar a versão que você acabou de baixar. Se mostrar a antiga, o `pip install` apontou para a pasta errada — confira o caminho.
+5. Reinicie o Claude Desktop
 
 Não é necessário alterar o `claude_desktop_config.json` — a configuração continua valendo.
 
