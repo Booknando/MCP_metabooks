@@ -205,10 +205,12 @@ reduzido.
   stdio no host e nem toca nessa VM. Evidência: `cowork_vm_node.log` →
   `[VM:start] Startup failed`, enquanto `mcp-server-metabooks.log` mostra o MCP saudável
   (`isError:false`, login `200 OK`). Passos de mitigação ficam no README (FAQ).
-- **`serverInfo.version` no handshake agora é a versão do projeto.** `FastMCP(...)` recebe
-  `version=__version__` (lido do metadado do pacote instalado via `importlib.metadata`), então o
-  handshake reporta `2.6.0` e não mais a versão do SDK. Rodando da árvore de código sem instalar,
-  a versão aparece como `0.0.0+local`. Para saber qual cópia foi iniciada, a linha
+- **`serverInfo.version` no handshake é a versão do projeto (desde a 2.7.0).** O `FastMCP`
+  **não** aceita `version=` — passar esse argumento derruba o servidor no construtor, e era
+  esse o defeito da 2.6.0. `build_server()` publica a versão depois de construir, em
+  `mcp._mcp_server.version` (lida do metadado do pacote instalado via `importlib.metadata`),
+  que é o que o `initialize` devolve. Rodando da árvore de código sem instalar, a versão
+  aparece como `0.0.0+local`. Para saber qual cópia foi iniciada, a linha
   `Using MCP server command:` em `mcp-server-metabooks.log` continua sendo a fonte.
 
 ## Exibição da capa via MCP Apps (experimental)
@@ -247,7 +249,7 @@ O extra `[dev]` traz `pytest` e `anyio` (a suíte).
 ## Testes
 
 ```bash
-pytest -q                  # suíte completa (~140 testes, sem rede)
+pytest -q                  # suíte completa (150 testes, sem rede)
 pytest tests/test_tools.py  # só as 12 tools via sessão MCP
 ```
 
@@ -300,6 +302,34 @@ sem arranhão.
 A rodada ao vivo (abaixo) **não** entra no CI: exige credenciais de produção e
 consome um slot de sessão paralela da MVB a cada execução.
 
+## Como cortar uma versão
+
+A versão mora num lugar só: `version` no `pyproject.toml`.
+`metabooks_mcp/__init__.py` a lê da metadata do pacote instalado, e `build_server()`
+a publica em `mcp._mcp_server.version`, que é o `serverInfo.version` do handshake.
+Não há número de versão escrito à mão em outro arquivo — não saia procurando.
+
+1. Bumpe `version` no `pyproject.toml`.
+2. **Reinstale** (`pip install -e .`) e rode a suíte. O reinstall não é opcional: a
+   metadata do pacote instalado é congelada no momento da instalação, inclusive em
+   modo editável. Sem ele, `__version__` continua devolvendo o número antigo e o
+   servidor anuncia a versão velha no handshake.
+   Note que `test_handshake_reporta_a_versao_do_projeto` **não pega isso** — ele
+   compara o handshake com a metadata instalada, que é a mesma fonte dos dois lados;
+   passa com o `pyproject.toml` em qualquer número. O que ele guarda é o servidor
+   deixar de publicar a versão, não você esquecer o bump. Em instalação limpa
+   (`pip install .`, o que o CI e o usuário final fazem) a metadata sai do
+   `pyproject.toml`, então a divergência só existe no ambiente de desenvolvimento.
+3. Atualize a nota de versão nos guias, se o release corrigir algo que o usuário
+   final precise saber para decidir se atualiza (foi o caso da 2.7.0, que corrigiu
+   um servidor que não iniciava).
+4. Tag anotada na `main`: `git tag -a vX.Y.Z -m "..."` e `git push origin vX.Y.Z`.
+
+O canal de distribuição é o ZIP da `main` pelo botão **Code** do GitHub, que é o que
+o README e o guia do macOS mandam baixar — a tag serve de marco histórico, não de
+artefato de instalação. Se um dia a instrução passar a apontar para uma release, os
+dois guias mudam junto (Passo 2 e a seção de atualização de cada um).
+
 ## Rodada de validação contra a API real
 
 A suíte offline valida o comportamento do servidor; ela não pode confirmar que
@@ -340,7 +370,7 @@ importantes de ler no relatório:
 | `base da paginação` | `_compact._envelope` faz `pagina = number + 1`. Se produção não for base 0, a normalização está errada. |
 | `busca json-short` / `detalhe (json)` | Lista os campos esperados que estiverem AUSENTES. Campo renomeado = projeção compacta empobrecendo em silêncio. |
 | `tipos de identificador` | Sem `productIdentifierType=15`, o ISBN-13 do detalhe compacto sai errado. |
-| `URL de mídia (…)` | Chama `client._same_api_host` na URL real. **FALHA aqui significa que a guarda anti-SSRF endurecida está bloqueando mídia legítima** — é a regressão mais provável da v2.6.0. |
+| `URL de mídia (…)` | Chama `client._same_api_host` na URL real. **FALHA aqui significa que a guarda anti-SSRF está bloqueando mídia legítima** — foi endurecida na v2.6.0 e é a checagem mais provável de quebrar se a MVB mudar o host dos arquivos. |
 | `size=251` / `size=0` | Confirma que os limites do schema (1–250) coincidem com os da API. |
 | `POST /products (json)` | O MCP envia `Content-Type: application/json`; a collection sugere `json-short`. Um 415 aqui indica que `client.post` precisa espelhar o `Accept`. |
 | `qualificador …` | 0 resultados pode ser catálogo sem correspondência **ou** qualificador inexistente. Confira à mão os que aparecerem com aviso antes de mantê-los no help. |
