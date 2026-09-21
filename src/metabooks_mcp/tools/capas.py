@@ -1,13 +1,17 @@
 """Tools de Capas — endpoint: /cover"""
 
 import os
+from functools import partial
+import anyio
 from pathlib import Path
 from typing import Annotated, Literal
 from mcp.server.fastmcp import FastMCP, Context, Image
 from pydantic import Field
 
 from ..client import path_segment
-from ._files import DestinationError, allowed_roots, resolve_target
+from ._errors import tool_errors, friendly_error, READ_ONLY, DOWNLOAD
+from ._files import save_download
+from ._media import media_extension, downscale_to_jpeg
 
 # --- MCP Apps (extensão io.modelcontextprotocol/ui) — EXPERIMENTAL --------------
 # Quando METABOOKS_ENABLE_UI_APP está ligado, a tool view_cover passa a referenciar
@@ -32,7 +36,8 @@ def register(mcp: FastMCP) -> None:
     ui_app = _ui_app_enabled()
     cover_meta = {"ui": {"resourceUri": COVER_UI_URI}} if ui_app else None
 
-    @mcp.tool(meta=cover_meta)
+    @mcp.tool(structured_output=False, meta=cover_meta, annotations=READ_ONLY)
+    @tool_errors
     async def metabooks_view_cover(
         ctx: Context,
         id: Annotated[
@@ -75,13 +80,15 @@ def register(mcp: FastMCP) -> None:
         except Exception as exc:  # noqa: BLE001 — devolve erro amigável ao cliente MCP
             return {
                 "error": (
-                    f"Não foi possível obter a capa de {id} (tamanho {size}): {exc}. "
+                    f"Não foi possível obter a capa de {id} (tamanho {size}): {friendly_error(exc)}. "
                     "Verifique o ISBN/GTIN, se a capa existe e se o token de capa tem permissão."
                 )
             }
+        data = await anyio.to_thread.run_sync(downscale_to_jpeg, data)
         return Image(data=data, format="jpeg")
 
-    @mcp.tool()
+    @mcp.tool(structured_output=False, annotations=DOWNLOAD)
+    @tool_errors
     async def metabooks_download_cover(
         ctx: Context,
         id: Annotated[
@@ -123,48 +130,24 @@ def register(mcp: FastMCP) -> None:
                 )
             }
         size_segment = f"/{path_segment(size)}" if size != "original" else ""
-        try:
-            data = await client.get_bytes(
-                f"cover/{path_segment(id)}{size_segment}", scope="cover", accept="*/*"
-            )
-        except Exception as exc:  # noqa: BLE001 — devolve erro amigável ao cliente MCP
-            return {
-                "error": (
-                    f"Não foi possível baixar a capa de {id} (tamanho {size}): {exc}. "
-                    "Verifique o ISBN/GTIN, se a capa existe e se o token de capa tem permissão."
-                )
-            }
-        if not data.startswith(b"\xff\xd8\xff"):
-            return {
-                "error": (
-                    f"O servidor não devolveu um JPEG válido para {id} (tamanho {size}). "
-                    f"Primeiros bytes: {data[:16]!r}."
-                )
-            }
-
-        filename = f"capa_{id}_{size}.jpg"
-        try:
-            target = resolve_target(
-                dest, filename, expected_ext="jpg", overwrite=overwrite
-            )
-        except DestinationError as exc:
-            return {"error": str(exc), "pastas_permitidas": allowed_roots()}
-        try:
-            os.makedirs(os.path.dirname(target), exist_ok=True)
-            with open(target, "wb") as fh:
-                fh.write(data)
-        except OSError as exc:
-            return {"error": f"Falha ao salvar a capa em {target}: {exc}"}
+        async with client.download(f"cover/{path_segment(id)}{size_segment}", scope="cover") as (file, mime):
+            ext = await anyio.to_thread.run_sync(media_extension, file, mime)
+            if ext != "jpg":
+                return {"error": "O servidor não devolveu um JPEG válido para esta capa."}
+            target, count = await anyio.to_thread.run_sync(partial(
+                save_download, file, dest, f"capa_{id}_{size}.jpg", "jpg", overwrite
+            ))
 
         return {
             "id": id,
             "size": size,
             "path": target,
-            "bytes": len(data),
-            "message": f"Capa salva em {target} ({len(data) / 1024:.1f} KB).",
+            "bytes": count,
+            "message": f"Capa salva em {target} ({count / 1024:.1f} KB).",
         }
 
-    @mcp.tool()
+    @mcp.tool(structured_output=False, annotations=READ_ONLY)
+    @tool_errors
     async def metabooks_get_cover_url(
         ctx: Context,
         id: Annotated[

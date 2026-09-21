@@ -1,13 +1,16 @@
 """Tools de Mídia/MMO — endpoint: /asset/mmo"""
 
-import os
+from functools import partial
+import anyio
 from io import BytesIO
 from typing import Annotated, Optional
 from mcp.server.fastmcp import FastMCP, Context, Image
 from pydantic import Field
 
 from ..client import path_segment
-from ._files import DestinationError, allowed_roots, resolve_target
+from ._errors import tool_errors, friendly_error, READ_ONLY, DOWNLOAD
+from ._files import save_download
+from ._media import media_extension, downscale_to_jpeg
 
 try:  # Pillow é usado para reduzir imagens grandes antes de exibi-las inline.
     from PIL import Image as PILImage
@@ -114,19 +117,9 @@ def _ext_from_label(label: str) -> str:
     return "bin"
 
 
-def _ext_from_bytes(data: bytes, fallback: str) -> str:
-    """Extensão pelos bytes mágicos; cai para `fallback` se não reconhecer."""
-    if data[:3] == b"\xff\xd8\xff":
-        return "jpg"
-    if data[:4] == b"%PDF":
-        return "pdf"
-    if data[:8] == b"\x89PNG\r\n\x1a\n":
-        return "png"
-    if data[:3] == b"ID3" or (len(data) > 1 and data[0] == 0xFF and (data[1] & 0xE0) == 0xE0):
-        return "mp3"
-    if data[:4] == b"PK\x03\x04":  # zip-based: epub/docx
-        return fallback if fallback in ("epub", "docx", "zip") else "epub"
-    return fallback
+def _ext_from_bytes(data: bytes, fallback: str = "") -> str:
+    """Compatibilidade interna: a extensão depende do conteúdo, nunca do rótulo."""
+    return media_extension(BytesIO(data))
 
 
 def _looks_like_image(data: bytes) -> bool:
@@ -134,13 +127,7 @@ def _looks_like_image(data: bytes) -> bool:
 
 
 def _downscale_to_jpeg(data: bytes, max_dim: int = MAX_INLINE_DIMENSION) -> bytes:
-    """Reduz a imagem (mantendo proporção, só encolhe) e recomprime em JPEG."""
-    with PILImage.open(BytesIO(data)) as img:
-        img = img.convert("RGB")
-        img.thumbnail((max_dim, max_dim))
-        out = BytesIO()
-        img.save(out, format="JPEG", quality=JPEG_QUALITY, optimize=True)
-        return out.getvalue()
+    return downscale_to_jpeg(data, max_dim)
 
 
 async def _list_assets(client, product_id: str) -> list[dict]:
@@ -150,7 +137,8 @@ async def _list_assets(client, product_id: str) -> list[dict]:
 
 def register(mcp: FastMCP) -> None:
 
-    @mcp.tool()
+    @mcp.tool(structured_output=False, annotations=READ_ONLY)
+    @tool_errors
     async def metabooks_get_media_assets(
         ctx: Context,
         product_id: Annotated[str, Field(description=_PRODUCT_ID_DESC)],
@@ -195,7 +183,8 @@ def register(mcp: FastMCP) -> None:
             ),
         }
 
-    @mcp.tool()
+    @mcp.tool(structured_output=False, annotations=READ_ONLY)
+    @tool_errors
     async def metabooks_view_media_asset(
         ctx: Context,
         product_id: Annotated[str, Field(description=_PRODUCT_ID_DESC)],
@@ -205,7 +194,7 @@ def register(mcp: FastMCP) -> None:
             Field(description="Tipo da mídia (ex.: BACKCOVER, IMAGE_SAMPLE_CONTENT) "
                               "quando não se passa asset_id."),
         ] = None,
-        index: Annotated[int, Field(description=_INDEX_DESC)] = 0,
+        index: Annotated[int, Field(ge=0, description=_INDEX_DESC)] = 0,
     ):
         """Exibe uma imagem de mídia (quarta capa, miolo, foto do autor) inline na conversa.
 
@@ -246,16 +235,17 @@ def register(mcp: FastMCP) -> None:
         try:
             data = await client.get_bytes_from_url(url, scope=_scope_for_url(url), accept="*/*")
         except Exception as exc:  # noqa: BLE001 — erro amigável ao cliente MCP
-            return {"error": f"Não foi possível buscar a mídia ({atype}): {exc}."}
+            return {"error": f"Não foi possível buscar a mídia ({atype}): {friendly_error(exc)}."}
         if not _looks_like_image(data):
             return {"error": f"O servidor não devolveu uma imagem para este asset ({atype})."}
         try:
-            small = _downscale_to_jpeg(data)
+            small = await anyio.to_thread.run_sync(_downscale_to_jpeg, data)
         except Exception as exc:  # noqa: BLE001
-            return {"error": f"Falha ao processar a imagem ({atype}): {exc}."}
+            return {"error": f"Falha ao processar a imagem ({atype}): {friendly_error(exc)}."}
         return Image(data=small, format="jpeg")
 
-    @mcp.tool()
+    @mcp.tool(structured_output=False, annotations=DOWNLOAD)
+    @tool_errors
     async def metabooks_download_media_asset(
         ctx: Context,
         product_id: Annotated[str, Field(description=_PRODUCT_ID_DESC)],
@@ -267,7 +257,7 @@ def register(mcp: FastMCP) -> None:
         ] = None,
         index: Annotated[
             int,
-            Field(description="Escolhe entre vários do mesmo tipo (0 = primeiro)."),
+            Field(ge=0, description="Escolhe entre vários do mesmo tipo (0 = primeiro)."),
         ] = 0,
         dest: Annotated[
             Optional[str],
@@ -303,34 +293,18 @@ def register(mcp: FastMCP) -> None:
             }
         atype = (asset.get("type") or "").upper()
         url = asset.get("url") or ""
-        try:
-            data = await client.get_bytes_from_url(url, scope=_scope_for_url(url), accept="*/*")
-        except Exception as exc:  # noqa: BLE001
-            return {"error": f"Não foi possível baixar a mídia ({atype}): {exc}."}
-
-        # O asset cru do listing não traz 'label' (isso é enriquecimento nosso),
-        # então o fallback de extensão vem do mapa de tipos.
-        ext = _ext_from_bytes(data, _ext_from_label(MEDIA_TYPE_LABELS.get(atype, "")))
-        resolved_id = _asset_id_of(asset) or f"{atype.lower()}_{asset.get('sequenceNumber') or 0}"
-        filename = f"midia_{product_id}_{resolved_id}.{ext}"
-        try:
-            target = resolve_target(
-                dest, filename, expected_ext=ext, overwrite=overwrite
-            )
-        except DestinationError as exc:
-            return {"error": str(exc), "pastas_permitidas": allowed_roots()}
-        try:
-            os.makedirs(os.path.dirname(target), exist_ok=True)
-            with open(target, "wb") as fh:
-                fh.write(data)
-        except OSError as exc:
-            return {"error": f"Falha ao salvar a mídia em {target}: {exc}"}
+        async with client.download(url, scope=_scope_for_url(url), absolute=True) as (file, mime):
+            ext = await anyio.to_thread.run_sync(media_extension, file, mime)
+            resolved_id = _asset_id_of(asset) or f"{atype.lower()}_{asset.get('sequenceNumber') or 0}"
+            target, count = await anyio.to_thread.run_sync(partial(
+                save_download, file, dest, f"midia_{product_id}_{resolved_id}.{ext}", ext, overwrite
+            ))
 
         return {
             "product_id": product_id,
             "type": atype,
             "asset_id": _asset_id_of(asset),
             "path": target,
-            "bytes": len(data),
-            "message": f"Mídia salva em {target} ({len(data) / 1024:.1f} KB).",
+            "bytes": count,
+            "message": f"Mídia salva em {target} ({count / 1024:.1f} KB).",
         }

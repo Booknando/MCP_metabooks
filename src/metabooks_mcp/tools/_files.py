@@ -17,6 +17,8 @@ explícito.
 import os
 import re
 import tempfile
+import shutil
+from typing import BinaryIO
 
 ENV_DOWNLOAD_DIR = "METABOOKS_DOWNLOAD_DIR"
 
@@ -37,7 +39,7 @@ def allowed_roots() -> list[str]:
     raw = os.environ.get(ENV_DOWNLOAD_DIR, "").strip()
     if raw:
         roots = [
-            os.path.abspath(os.path.expanduser(part))
+            os.path.abspath(os.path.expanduser(part.strip()))
             for part in raw.split(os.pathsep)
             if part.strip()
         ]
@@ -58,6 +60,8 @@ def safe_filename(name: str, fallback: str = "arquivo") -> str:
     """Higieniza um nome de arquivo: sem separadores de path, sem surpresas."""
     name = os.path.basename(str(name or "")).strip()
     name = _SAFE_CHARS.sub("_", name).strip("._-")
+    if name.split(".")[0].upper() in {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}:
+        name = "arquivo_" + name
     return name or fallback
 
 
@@ -142,3 +146,41 @@ def resolve_target(
             f"O arquivo já existe: {target}. Peça overwrite=true para substituí-lo."
         )
     return target
+
+
+def save_download(source: BinaryIO, dest: str | None, filename: str,
+                  expected_ext: str, overwrite: bool = False) -> tuple[str, int]:
+    """Publica um arquivo completo; criação exclusiva quando não pode substituir.
+
+    O temporário fica no mesmo filesystem do destino. link() cria o nome final
+    atomicamente e recusa qualquer nome já existente, inclusive criado após a
+    validação. Sem suporte a hardlink, falha sem adotar uma cópia insegura.
+    """
+    target = resolve_target(dest, filename, expected_ext=expected_ext, overwrite=overwrite)
+    parent = os.path.dirname(target)
+    os.makedirs(parent, exist_ok=True)
+    target = resolve_target(target, filename, expected_ext=expected_ext, overwrite=overwrite)
+    fd, temporary = tempfile.mkstemp(prefix=".metabooks-", suffix=".part", dir=parent)
+    try:
+        with os.fdopen(fd, "wb") as output:
+            source.seek(0)
+            shutil.copyfileobj(source, output, length=64 * 1024)
+            output.flush()
+            os.fsync(output.fileno())
+            size = output.tell()
+        # Revalida também após a cópia para detectar mudança do destino.
+        if resolve_target(target, filename, expected_ext=expected_ext, overwrite=overwrite) != target:
+            raise DestinationError("O destino mudou durante o download. Tente novamente.")
+        if overwrite:
+            os.replace(temporary, target)
+        else:
+            try:
+                os.link(temporary, target)
+            except FileExistsError as exc:
+                raise DestinationError(f"O arquivo já existe: {target}.") from exc
+            except OSError as exc:
+                raise DestinationError("A pasta não suporta gravação exclusiva atômica. Escolha uma pasta local compatível.") from exc
+        return target, size
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
