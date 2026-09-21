@@ -144,9 +144,11 @@ def _deep_get(obj: Any, candidates: list[str], _depth: int = 0) -> Any:
                     nested = _deep_get(val, candidates, _depth + 1)
                     if nested is not None:
                         return nested
-        # 2) desce nos sub-objetos
-        for v in obj.values():
-            if isinstance(v, (dict, list)):
+        # Somente blocos bibliográficos do próprio produto. Nunca atravessar
+        # relatedProducts, endereços de editora ou metadados de terceiros.
+        for key, v in obj.items():
+            if key.lower() in {"titles", "titleelements", "publishers", "form",
+                               "extent", "languages", "texts", "textcontents"} and isinstance(v, (dict, list)):
                 found = _deep_get(v, candidates, _depth + 1)
                 if found is not None:
                     return found
@@ -167,6 +169,19 @@ def _get_ci(obj: Any, key: str) -> Any:
     return None
 
 
+def _product_value(p: dict, candidates: list[str], blocks: tuple[str, ...] = ()) -> Any:
+    """Campo do produto ou de um bloco explicitamente associado a esse campo."""
+    for key in candidates:
+        value = _get_ci(p, key)
+        if isinstance(value, (str, int, float, bool)) and str(value).strip():
+            return value
+    for block in blocks:
+        value = _deep_get(_get_ci(p, block), candidates)
+        if value is not None:
+            return value
+    return None
+
+
 def _extract_isbn(p: dict) -> str | None:
     """ISBN-13/GTIN-13, tolerante às três formas da API.
 
@@ -174,7 +189,7 @@ def _extract_isbn(p: dict) -> str | None:
     identifiers[].idValue filtrado por productIdentifierType (15=ISBN-13,
     03=GTIN-13, 02=ISBN-10) — sem esse filtro, _deep_get pegaria qualquer idValue.
     """
-    flat = _deep_get(p, ISBN_FLAT_CANDS)
+    flat = _first_top_level(p, ISBN_FLAT_CANDS)
     if flat and str(flat).strip():
         return str(flat).strip()
     for key in ("identifiers", "productIdentifiers"):
@@ -191,7 +206,7 @@ def _extract_isbn(p: dict) -> str | None:
             for t in ("15", "03", "02"):
                 if by_type.get(t):
                     return by_type[t]
-    fallback = _deep_get(p, ISBN_FALLBACK_CANDS)
+    fallback = _first_top_level(p, ISBN_FALLBACK_CANDS)
     return str(fallback).strip() if fallback and str(fallback).strip() else None
 
 
@@ -254,14 +269,20 @@ def _extract_price(p: dict) -> str | None:
     Busca/json-short usa o campo plano `priceBrl` (moeda BRL implícita); o detalhe
     ONIX usa prices[].priceAmount + currencyCode.
     """
-    brl = _deep_get(p, ["priceBrl"])
+    brl = _first_top_level(p, ["priceBrl"])
     if brl is not None and str(brl).strip():
         try:
             return f"{float(brl):.2f} BRL"
         except (TypeError, ValueError):
             pass
-    amount = _deep_get(p, ["priceAmount", "priceValue"])
-    currency = _deep_get(p, ["currencyCode", "currency"])
+    record = p
+    if _first_top_level(record, ["priceAmount", "priceValue"]) is None:
+        prices = _get_ci(p, "prices")
+        if isinstance(prices, list):
+            record = next((item for item in prices if isinstance(item, dict)
+                           and _first_top_level(item, ["priceAmount", "priceValue"]) is not None), {})
+    amount = _first_top_level(record, ["priceAmount", "priceValue"])
+    currency = _first_top_level(record, ["currencyCode", "currency"])
     if amount is None:
         return None
     try:
@@ -273,10 +294,10 @@ def _extract_price(p: dict) -> str | None:
 
 def _extract_format(p: dict) -> str | None:
     """Formato legível: prefere productType (ebook/pbook), depois código ONIX 150."""
-    pt = _deep_get(p, ["productType"])
+    pt = _product_value(p, ["productType"])
     if pt and str(pt).strip().lower() in PRODUCT_TYPE_MAP:
         return PRODUCT_TYPE_MAP[str(pt).strip().lower()]
-    code = _deep_get(p, FORM_CODE_CANDS)
+    code = _product_value(p, FORM_CODE_CANDS, ("form",))
     if code:
         return PRODUCT_FORM_MAP.get(str(code).strip().upper(), str(code))
     return str(pt) if pt else None
@@ -288,25 +309,25 @@ def _extract_availability(p: dict) -> str | None:
     availabilityStatePublisher/productAvailability são códigos cujo significado
     não é confiável aqui, então não viram texto (ficam no detalhe reduzido).
     """
-    st = _deep_get(p, ["state"])
+    st = _first_top_level(p, ["state"])
     if st and str(st).strip():
         return STATE_MAP.get(str(st).strip().lower(), str(st).strip())
     act = _get_ci(p, "active")
     if isinstance(act, bool):
         return "ativo" if act else "inativo"
-    txt = _deep_get(p, ["productAvailabilityText", "availabilityText"])
+    txt = _first_top_level(p, ["productAvailabilityText", "availabilityText"])
     return str(txt).strip() if txt and str(txt).strip() else None
 
 
 def _extract_language(p: dict) -> str | None:
-    code = _deep_get(p, LANG_CANDS)
+    code = _product_value(p, LANG_CANDS, ("languages",))
     if not code:
         return None
     return LANG_MAP.get(str(code).strip().lower()[:3], str(code).strip())
 
 
 def _extract_pages(p: dict) -> Any:
-    return _deep_get(p, PAGES_CANDS)
+    return _product_value(p, PAGES_CANDS, ("extent",))
 
 
 def _shrink(obj: Any, max_str: int = MAX_STR, max_items: int = MAX_ITEMS,
@@ -345,15 +366,15 @@ def compact_product(p: dict) -> dict:
             out[campo] = val
 
     # Ordem deliberada de leitura (identificação → bibliográfico → comercial).
-    put("uuid", _deep_get(p, CANDIDATES["uuid"]))
+    put("uuid", _first_top_level(p, CANDIDATES["uuid"]))
     put("isbn", _extract_isbn(p))
-    put("titulo", _deep_get(p, CANDIDATES["titulo"]))
-    put("subtitulo", _deep_get(p, CANDIDATES["subtitulo"]))
+    put("titulo", _product_value(p, CANDIDATES["titulo"], ("titles",)))
+    put("subtitulo", _product_value(p, CANDIDATES["subtitulo"], ("titles",)))
     autores = _extract_authors(p)
     if autores:
         out["autores"] = autores
-    put("editora", _deep_get(p, CANDIDATES["editora"]))
-    put("data_publicacao", _deep_get(p, CANDIDATES["data_publicacao"]))
+    put("editora", _product_value(p, CANDIDATES["editora"], ("publishers",)))
+    put("data_publicacao", _product_value(p, CANDIDATES["data_publicacao"]))
     put("formato", _extract_format(p))
     put("paginas", _extract_pages(p))
     put("idioma", _extract_language(p))
@@ -378,7 +399,7 @@ def compact_detail(p: dict) -> dict:
     if not isinstance(p, dict):
         return {"_dados_brutos_reduzidos": _shrink(p)}
     resumo = compact_product(p)
-    desc = _deep_get(p, CANDIDATES_DESC)
+    desc = _product_value(p, CANDIDATES_DESC, ("texts", "textContents"))
     if desc and isinstance(desc, str):
         resumo["descricao"] = _truncate(desc, MAX_DESC)
     return {

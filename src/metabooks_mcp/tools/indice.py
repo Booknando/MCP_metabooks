@@ -5,11 +5,13 @@ from mcp.server.fastmcp import FastMCP, Context
 from pydantic import Field
 
 from ..client import path_segment
+from ._errors import tool_errors, READ_ONLY
 
 
 def register(mcp: FastMCP) -> None:
 
-    @mcp.tool()
+    @mcp.tool(structured_output=False, annotations=READ_ONLY)
+    @tool_errors
     async def metabooks_index_search(
         ctx: Context,
         field: Annotated[

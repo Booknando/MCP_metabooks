@@ -18,6 +18,12 @@ Antes de começar, separe:
 
 ## Instalação passo a passo
 
+**Instalação guiada (Windows e Mac):** extraia o ZIP completo e abra
+`Instalar-Windows.cmd` ou `Instalar-Mac.command`. O assistente instala em ambiente
+isolado, pede as credenciais e configura o Claude com backup. Para atualizar,
+use `Atualizar-Windows.cmd` ou `Atualizar-Mac.command`.
+Veja [instruções e restauração](docs/instalador.md). Os passos manuais continuam abaixo.
+
 > 🍎 **No Mac?** Os caminhos e comandos são diferentes (o executável não fica no PATH do Claude Desktop). Siga o guia dedicado: **[docs/instalacao-mac.md](docs/instalacao-mac.md)**. As instruções abaixo são para **Windows**.
 
 ### Passo 1 — Instalar o Python
@@ -36,11 +42,11 @@ Antes de começar, separe:
 
 ### Passo 2 — Baixar e instalar o Metabooks MCP
 
-1. Nesta página do GitHub, clique no botão verde **`< > Code`** e depois em **Download ZIP**
-2. Extraia o conteúdo para a pasta **`C:\Metabooks-mcp`**
+1. Abra [Releases no GitHub](https://github.com/Booknando/MCP_metabooks/releases) e escolha uma versão publicada. Baixe **Source code (zip)**. Se ainda não houver uma release publicada, use **Code → Download ZIP** na página do repositório (versão de desenvolvimento).
+2. Extraia o ZIP e coloque os arquivos do projeto em **`C:\Metabooks-mcp`**. O arquivo `pyproject.toml` deve ficar diretamente nessa pasta, sem uma subpasta extra.
 3. Abra o Prompt de Comando (`Win + R` → `cmd`) e execute:
    ```
-   pip install C:\Metabooks-mcp
+   python -m pip install C:\Metabooks-mcp
    ```
 
 Isso instala o comando `metabooks-mcp` no seu Python. Para verificar, execute:
@@ -167,7 +173,7 @@ Se o Claude responder com dados do catálogo Metabooks, a instalação está fun
 
 **Como saber se o servidor está falhando ao iniciar**
 
-Abra o log em `%APPDATA%\Roaming\Claude\logs\mcp-server-metabooks.log` (no Mac, `~/Library/Logs/Claude/mcp-server-metabooks.log`). Se houver um `Traceback` do Python no fim do arquivo, o servidor morreu antes de se conectar — a mensagem da última linha diz o motivo. Um teste direto, fora do Claude Desktop:
+Abra o log em `%APPDATA%\Claude\logs\mcp-server-metabooks.log` (no Mac, `~/Library/Logs/Claude/mcp-server-metabooks.log`). Se houver um `Traceback` do Python no fim do arquivo, o servidor morreu antes de se conectar — a mensagem da última linha diz o motivo. Um teste direto, fora do Claude Desktop:
 
 ```
 metabooks-mcp --help
@@ -236,11 +242,11 @@ Essa é a **VM do Cowork** (o ambiente que executa código e arquivos dentro do 
 4. Verifique se antivírus/firewall corporativo está bloqueando o serviço de VM.
 5. Se o aviso oferecer o link **"reinstalar o workspace"**, use-o.
 
-Para confirmar a recuperação, veja `%APPDATA%\Roaming\Claude\logs\cowork_vm_node.log` (a linha de sucesso é `[VM:start] Windows VM service configured`).
+Para confirmar a recuperação, veja `%APPDATA%\Claude\logs\cowork_vm_node.log` (a linha de sucesso é `[VM:start] Windows VM service configured`).
 
 **"Como sei qual cópia do MCP o Claude está usando?"**
 
-Abra `%APPDATA%\Roaming\Claude\logs\mcp-server-metabooks.log` e procure a linha `Using MCP server command:` — ela mostra o caminho do executável realmente iniciado. Se você instalou o `metabooks-mcp` em mais de um ambiente Python, podem existir cópias diferentes; garanta que o `claude_desktop_config.json` aponta para a correta. A partir da 2.7.0 o próprio handshake informa a versão do servidor (antes ele mostrava a versão do SDK MCP); para conferir pela linha de comando, rode `pip show metabooks-mcp`.
+Abra `%APPDATA%\Claude\logs\mcp-server-metabooks.log` e procure a linha `Using MCP server command:` — ela mostra o caminho do executável realmente iniciado. Se você instalou o `metabooks-mcp` em mais de um ambiente Python, podem existir cópias diferentes; garanta que o `claude_desktop_config.json` aponta para a correta. A partir da 2.7.0 o próprio handshake informa a versão do servidor (antes ele mostrava a versão do SDK MCP); para conferir pela linha de comando, rode `pip show metabooks-mcp`.
 
 ---
 
@@ -331,9 +337,9 @@ URLs disponíveis:
 
 ## Atualizando para uma nova versão
 
-1. Baixe o novo ZIP do repositório (mesmo processo do Passo 2)
+1. Baixe o ZIP da versão desejada nas Releases do GitHub (mesmo processo do Passo 2). Guarde o número da versão para facilitar o suporte.
 2. Extraia e substitua os arquivos em `C:\Metabooks-mcp`
-3. Execute novamente: `pip install C:\Metabooks-mcp`
+3. Execute novamente: `python -m pip install C:\Metabooks-mcp`
 4. Confirme que a versão nova ficou instalada:
    ```
    pip show metabooks-mcp
@@ -371,5 +377,37 @@ Software proprietário da Booknando Livros: licença de **uso apenas**, sem dire
 
 ---
 
+> Distribuição somente pelo GitHub; este projeto não é publicado no PyPI. Veja as mudanças em [CHANGELOG.md](CHANGELOG.md).
+
 > Informações técnicas para desenvolvedores: consulte [DEVELOPERS.md](DEVELOPERS.md).
 > Instalação no macOS: consulte [docs/instalacao-mac.md](docs/instalacao-mac.md).
+
+
+## Diagnóstico e configuração alternativa
+
+Execute `metabooks-mcp --diagnose` para conferir versão, presença das credenciais e
+pastas de download. O comando é offline e não mostra senhas, tokens nem a URL
+configurada. Presença de credencial não confirma sua validade na API.
+
+O bloco `env` do cliente MCP continua sendo a configuração recomendada. Para
+terminal ou outro cliente, também é possível usar um arquivo local confiável:
+
+```
+metabooks-mcp --env-file C:\Metabooks-mcp\.env --diagnose
+```
+
+Sem `--env-file`/`METABOOKS_ENV_FILE`, o servidor lê `.env` do diretório atual e
+depois `~/.config/metabooks-mcp/.env`. Variáveis já definidas no ambiente têm
+prioridade. Um arquivo escolhido explicitamente substitui a busca automática.
+Mantenha esses arquivos privados; não os envie ao GitHub.
+
+Downloads são limitados a **50 MiB** por arquivo; imagens para visualização a
+**10 MiB** transferidos e **25 milhões de pixels**. Conteúdo inválido ou com tipo
+incompatível é recusado. WAV é salvo como `.wav`; arquivos ZIP genéricos não são
+tratados como EPUB. Em uma pasta sem suporte a criação atômica por hardlink, use
+uma pasta local compatível (por exemplo, NTFS no Windows).
+
+As consultas tentam novamente até duas vezes em falhas temporárias de rede ou
+HTTP 429/500/502/503/504. Esperas solicitadas pela API acima de dez segundos são
+devolvidas como erro para uma nova tentativa posterior. Login não é repetido
+automaticamente em falha de rede, evitando abrir sessões duplicadas.

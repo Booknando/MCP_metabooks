@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: ["main"]
@@ -41,6 +44,10 @@ jobs:
 
       - name: Rodar a suíte
         run: python -m pytest -q
+
+      - name: Instalação guiada em perfil temporário
+        if: matrix.python == '3.12'
+        run: python scripts/smoke_installer.py
 
   resolucao-de-dependencias:
     name: Instalação limpa, SDK ${{ matrix.sdk }} (protege o teto do mcp)
@@ -90,3 +97,40 @@ jobs:
 
       - name: Registrar a versão do SDK resolvida
         run: python -c "from importlib.metadata import version; print('mcp', version('mcp'))"
+
+      - name: Handshake stdio e configuração do pacote instalado
+        run: python scripts/smoke_package.py
+
+      - name: Regressões no SDK mínimo e no resolvido
+        run: |
+          python -m pip install pytest
+          python -m pytest -q
+
+  package:
+    name: Artefato instalado (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Construir wheel a partir do sdist e validar metadados
+        run: |
+          python -m pip install build twine
+          python -m build
+          python -m twine check dist/*
+      - name: Instalar o wheel distribuído
+        run: python -c "import glob, subprocess, sys; subprocess.check_call([sys.executable, '-m', 'pip', 'install', glob.glob('dist/*.whl')[0]])"
+      - name: Verificar dependências e protocolo fora da árvore fonte
+        run: |
+          python -m pip check
+          python scripts/smoke_package.py
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          name: metabooks-package
+          path: dist/*

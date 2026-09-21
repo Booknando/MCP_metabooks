@@ -249,7 +249,7 @@ O extra `[dev]` traz `pytest` e `anyio` (a suíte).
 ## Testes
 
 ```bash
-pytest -q                  # suíte completa (150 testes, sem rede)
+pytest -q                  # suíte offline; testes ao vivo ficam pulados
 pytest tests/test_tools.py  # só as 12 tools via sessão MCP
 ```
 
@@ -325,10 +325,15 @@ Não há número de versão escrito à mão em outro arquivo — não saia procu
    um servidor que não iniciava).
 4. Tag anotada na `main`: `git tag -a vX.Y.Z -m "..."` e `git push origin vX.Y.Z`.
 
-O canal de distribuição é o ZIP da `main` pelo botão **Code** do GitHub, que é o que
-o README e o guia do macOS mandam baixar — a tag serve de marco histórico, não de
-artefato de instalação. Se um dia a instrução passar a apontar para uma release, os
-dois guias mudam junto (Passo 2 e a seção de atualização de cada um).
+O canal de distribuição é exclusivamente o GitHub. `Private :: Do Not Upload`
+permanece no pacote; nenhum workflow envia ao PyPI.
+
+Ao enviar uma tag `vX.Y.Z`, `.github/workflows/release.yml` verifica a versão,
+executa a suíte offline, constrói wheel e sdist, instala o wheel e valida stdio.
+Depois prepara uma **GitHub Release em rascunho**, com artefatos e SHA256SUMS.
+Revise o changelog e valide a rodada ao vivo antes de publicar o rascunho.
+Os guias orientam a instalar o ZIP de uma release publicada; enquanto não
+houver release, o ZIP da main continua disponível como versão de desenvolvimento.
 
 ## Rodada de validação contra a API real
 
@@ -416,13 +421,16 @@ Cada módulo em `src/metabooks_mcp/tools/` segue o mesmo padrão:
 ```python
 from typing import Annotated, Optional
 from mcp.server.fastmcp import FastMCP, Context
+from pydantic import Field
+from ._errors import tool_errors, READ_ONLY
 
 def register(mcp: FastMCP) -> None:
 
-    @mcp.tool()
+    @mcp.tool(structured_output=False, annotations=READ_ONLY)
+    @tool_errors
     async def metabooks_minha_ferramenta(
         ctx: Context,
-        parametro: Annotated[str, "Descrição do parâmetro"],
+        parametro: Annotated[str, Field(description="Descrição do parâmetro")],
     ) -> dict:
         """Descrição da ferramenta (aparece no Claude)."""
         client = ctx.request_context.lifespan_context["metabooks"]
@@ -448,16 +456,17 @@ data = await client.get_bytes("cover/9788530951382/m", scope="cover", accept="*/
 return Image(data=data, format="jpeg")
 ```
 
-Para gravar arquivo, use `_files.resolve_target` e trate `DestinationError` —
-nunca chame `open()` num caminho vindo do modelo sem passar por ele:
+Para gravar arquivo, use `_files.save_download` numa worker thread. Ele valida
+o destino e publica somente o arquivo completo, sem sobrescrita implícita:
 
 ```python
-from ._files import DestinationError, allowed_roots, resolve_target
-# ...
-try:
-    target = resolve_target(dest, filename, expected_ext="pdf", overwrite=overwrite)
-except DestinationError as exc:
-    return {"error": str(exc), "pastas_permitidas": allowed_roots()}
+from functools import partial
+import anyio
+from ._files import save_download
+# file já foi baixado/validado; tool_errors trata DestinationError.
+target, size = await anyio.to_thread.run_sync(partial(
+    save_download, file, dest, filename, "pdf", overwrite
+))
 ```
 
 Depois, registre o novo módulo em `server.py`:
@@ -517,3 +526,36 @@ No `claude_desktop_config.json`, aponte para o módulo Python diretamente:
 - [python-dotenv](https://github.com/theskumar/python-dotenv) — leitura de `.env`
 - [Pillow](https://python-pillow.org/) — redução de imagens de mídia para exibição inline
 - [hatchling](https://hatch.pypa.io/) — build system
+
+
+## Confiabilidade e testes do pacote (2.8.0)
+
+- A renovação por TTL usa relógio monotônico e aguarda as requisições de
+  metadados em andamento terminarem antes do logout/login. Falha no logout
+  impede abrir outra sessão; no encerramento do processo a limpeza é best-effort.
+- Consultas GET e somente os POST de `/products` e `/product/multipleProducts`
+  podem repetir falhas temporárias: duas repetições, esperas de 0,5/1 segundo,
+  respeitando Retry-After em segundos ou data HTTP. Se ele pedir mais de dez
+  segundos, a chamada falha sem repetir antes do prazo. Login não tem retry.
+- `tool_errors` devolve CallToolResult com `isError=true` e texto JSON para
+  falhas; sucesso em dict mantém texto e structuredContent. O registro usa
+  `structured_output=False` porque versões 1.x do SDK tentam validar também
+  o structuredContent de erros quando inferem um outputSchema obrigatório.
+- `load_configuration` só roda no CLI; importar o módulo não altera o ambiente.
+  Precedência: ambiente existente > arquivo explícito (quando selecionado);
+  sem seleção: ambiente > `.env` de CWD > `.env` do diretório do usuário.
+  `--diagnose` não faz requisições nem mostra valores das credenciais.
+- Downloads usam streaming com temporário em disco e limite de 50 MiB;
+  visualização usa no máximo 10 MiB e 25 milhões de pixels. Processamento de
+  imagem e gravação rodam em worker threads. O detector confere conteúdo e
+  Content-Type; PDF deve ter marcador de fim, EPUB deve declarar seu mimetype.
+  A validação de formato não é um antivírus ou parser completo de PDF/áudio.
+- `save_download` cria temporário na pasta final, sincroniza o conteúdo e usa
+  hardlink exclusivo (sem sobrescrita) ou replace atômico (com sobrescrita).
+  Filesystems sem hardlink falham com orientação, sem fallback inseguro.
+- A projeção compacta não atravessa produtos relacionados nem endereços de
+  editoras para buscar identificadores/status. Preço e moeda saem do mesmo registro.
+- `scripts/smoke_package.py` valida o pacote instalado fora da árvore fonte:
+  versão, `.env`, handshake stdio, 12 tools e recurso HTML experimental.
+  Rode após `python -m build` e instalação do wheel. O CI faz isso nos três SOs
+  e exercita também o SDK mínimo. Não consulta a API de produção.

@@ -1,5 +1,9 @@
 # Metabooks MCP Server: Guia de Instalação para Mac
 
+**Instalação guiada:** extraia o ZIP completo e abra `Instalar-Mac.command`.
+Para atualizar, use `Atualizar-Mac.command`. Veja o [guia do instalador](instalador.md)
+para requisitos, permissões de execução e restauração do backup.
+
 Permite que o Claude consulte o catálogo Metabooks diretamente na conversa: busque livros, veja metadados completos, capas e dados de editoras, sem sair do chat.
 
 O servidor roda no seu próprio computador. Suas credenciais Metabooks ficam salvas só na sua máquina e nunca saem dela.
@@ -36,11 +40,11 @@ Anote esse número de versão (no exemplo, `3.13`). Você vai usar esse mesmo n�
 
 ### Passo 2: Baixar e instalar o Metabooks MCP
 
-1. Acesse a [página do repositório no GitHub](https://github.com/Booknando/MCP_metabooks), clique no botão verde **`< > Code`** e depois em **Download ZIP** (ou baixe direto por [este link](https://github.com/Booknando/MCP_metabooks/archive/refs/heads/main.zip)).
-2. O Mac geralmente descompacta o arquivo automaticamente na pasta Downloads, criando uma pasta chamada `MCP_metabooks-main`. Se não descompactar, dê duplo clique no `.zip`.
+1. Abra [Releases no GitHub](https://github.com/Booknando/MCP_metabooks/releases), escolha uma versão publicada e baixe **Source code (zip)**. Se ainda não houver release, use **Code → Download ZIP** no repositório (versão de desenvolvimento).
+2. Descompacte o ZIP em Downloads e renomeie a pasta que contém `pyproject.toml` para `Metabooks-mcp`. A pasta do ZIP pode incluir a versão ou o sufixo `main`.
 3. No Terminal, instale com o comando (troque `3.13` pela versão que você instalou no Passo 1):
 ```
-python3.13 -m pip install ~/Downloads/MCP_metabooks-main
+python3.13 -m pip install ~/Downloads/Metabooks-mcp
 ```
 4. Ao final da instalação, o Terminal costuma mostrar um aviso parecido com:
 ```
@@ -260,7 +264,7 @@ URLs disponíveis:
 1. Baixe o novo ZIP do repositório (mesmo processo do Passo 2).
 2. No Terminal, instale por cima com a flag de upgrade (troque `3.13` pela sua versão e o caminho da pasta pela nova):
 ```
-python3.13 -m pip install --upgrade ~/Downloads/MCP_metabooks-main
+python3.13 -m pip install --upgrade ~/Downloads/Metabooks-mcp
 ```
 3. Confirme que a versão nova ficou instalada:
 ```
@@ -289,3 +293,14 @@ Software proprietário da Booknando Livros: licença de uso apenas, sem direito 
 ---
 
 Informações técnicas para desenvolvedores: consulte [DEVELOPERS.md](../DEVELOPERS.md).
+
+
+## Diagnóstico e versões
+
+Acrescente `--diagnose` ao caminho completo do executável para conferir a versão
+e a presença das credenciais sem revelar seus valores. Para um `.env` explícito,
+use `--env-file /caminho/confiavel/.env`. Consulte a precedência da configuração
+e os limites de download no [README](../README.md#diagnóstico-e-configuração-alternativa).
+
+A distribuição continua exclusivamente no GitHub. Prefira uma release versionada
+quando disponível e consulte [CHANGELOG.md](../CHANGELOG.md) antes de atualizar.

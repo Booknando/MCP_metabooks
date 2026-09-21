@@ -1,20 +1,48 @@
 """MCP Server para integração com a API REST v2 da Metabooks."""
 
 import argparse
+import json
 import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
 from mcp.server.fastmcp import FastMCP
+import anyio
 from dotenv import load_dotenv
 
 from . import __version__
 from .client import MetabooksClient
 from .tools import produtos, capas, midia, indice, editora
 
-# Busca .env no diretório atual e em ~/.config/metabooks-mcp/ (útil para uso via uvx)
-load_dotenv()
-load_dotenv(os.path.expanduser("~/.config/metabooks-mcp/.env"))
+
+def load_configuration(env_file: str | None = None) -> list[str]:
+    """Ambiente explícito tem prioridade; depois arquivo escolhido/CWD e usuário."""
+    selected = env_file or os.environ.get("METABOOKS_ENV_FILE")
+    paths = [Path(selected).expanduser()] if selected else [
+        Path.cwd() / ".env", Path.home() / ".config/metabooks-mcp/.env"
+    ]
+    if selected and not paths[0].is_file():
+        raise ValueError("Arquivo de configuração não encontrado.")
+    loaded = []
+    for path in paths:
+        if path.is_file():
+            load_dotenv(path, override=False)
+            loaded.append(str(path.resolve()))
+    return loaded
+
+
+def diagnostics() -> dict:
+    """Diagnóstico offline: nunca imprime valores das credenciais."""
+    from .tools._files import allowed_roots
+    names = ("METABOOKS_USERNAME", "METABOOKS_PASSWORD", "METABOOKS_METADATA_TOKEN",
+             "METABOOKS_COVER_TOKEN", "METABOOKS_MMO_TOKEN")
+    present = {name: bool(os.environ.get(name, "").strip()) for name in names}
+    return {"version": __version__, "transport": "stdio", "credentials_present": present,
+            "metadata_configured": present["METABOOKS_METADATA_TOKEN"] or (
+                present["METABOOKS_USERNAME"] and present["METABOOKS_PASSWORD"]),
+            "custom_api_configured": bool(os.environ.get("METABOOKS_BASE_URL")),
+            "download_directories": allowed_roots()}
 
 
 @asynccontextmanager
@@ -31,8 +59,10 @@ async def lifespan(server: FastMCP) -> AsyncIterator[dict]:
         yield {"metabooks": client}
     finally:
         # Libera o slot de login paralelo antes de encerrar (no-op para token estático).
-        await client.logout()
-        await client.aclose()
+        with anyio.move_on_after(5, shield=True):
+            await client.logout()
+        with anyio.CancelScope(shield=True):
+            await client.aclose()
 
 
 def build_server() -> FastMCP:
@@ -126,7 +156,16 @@ def main() -> None:
         default="stdio",
         help="Transporte MCP a usar (somente stdio; ver descrição acima)",
     )
+    parser.add_argument("--env-file", help="Arquivo .env explícito (ambiente existente tem prioridade).")
+    parser.add_argument("--diagnose", action="store_true", help="Diagnóstico offline sem revelar credenciais.")
     args = parser.parse_args()
+    try:
+        load_configuration(args.env_file)
+    except (OSError, ValueError):
+        parser.error("Não foi possível carregar o arquivo de configuração escolhido.")
+    if args.diagnose:
+        print(json.dumps(diagnostics(), ensure_ascii=False, indent=2))
+        return
 
     # O servidor é construído aqui (não no nível do módulo) para que --help saia
     # pelo argparse sem pagar o custo — e sem registrar handlers de atexit.

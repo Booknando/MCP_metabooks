@@ -1,14 +1,24 @@
 """Cliente HTTP para a API REST v2 da Metabooks."""
 
 import asyncio
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import posixpath
+import math
+import tempfile
 import time
+import anyio
 import httpx
-from typing import Any, Literal
+from typing import Any, BinaryIO, Literal
 from urllib.parse import quote, urlparse
 
 DEFAULT_BASE_URL = "https://api.metabooks.com/api/v2"
 TOKEN_TTL = 50 * 60  # 50 minutos (API expira em 60 min — seção 5.5.1.2)
+MAX_INLINE_BYTES = 10 * 1024 * 1024
+MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024
+MAX_RETRIES = 2
+MAX_RETRY_WAIT = 10.0
 
 Scope = Literal["metadata", "cover", "mmo"]
 
@@ -58,38 +68,57 @@ class MetabooksClient:
         # Serializa o login: sem isto, N chamadas simultâneas disparam N logins e
         # cada um ocupa um slot de sessão paralela da MVB, liberado só após 60 min.
         self._login_lock = asyncio.Lock()
+        self._login_idle = asyncio.Condition(self._login_lock)
+        self._active_metadata = 0
 
     # --- Autenticação ----------------------------------------------------------
 
     def _token_is_fresh(self) -> bool:
-        return bool(self._login_token) and self._token_expires_at > time.time()
+        return bool(self._login_token) and self._token_expires_at > time.monotonic()
 
     async def _get_metadata_token(self) -> str:
         if self.metadata_token:
             return self.metadata_token
-        if self._token_is_fresh():
-            return self._login_token  # type: ignore[return-value]
-        async with self._login_lock:
-            # Outra corrotina pode ter logado enquanto esperávamos o lock.
-            if self._token_is_fresh():
-                return self._login_token  # type: ignore[return-value]
-            token = await self._do_login()
-            self._login_token = token
-            # TTL contado APÓS o round-trip do login, não antes.
-            self._token_expires_at = time.time() + TOKEN_TTL
-            return token
+        async with self._login_idle:
+            return await self._ensure_token_locked()
 
-    async def _relogin(self, stale_token: str) -> str:
-        """Renova o token depois de um 401, sem disparar logins concorrentes."""
-        async with self._login_lock:
-            if self._login_token != stale_token and self._token_is_fresh():
-                return self._login_token  # type: ignore[return-value]
-            self._login_token = None
-            self._token_expires_at = 0.0
-            token = await self._do_login()
-            self._login_token = token
-            self._token_expires_at = time.time() + TOKEN_TTL
-            return token
+    async def _ensure_token_locked(self) -> str:
+        # O lock protege tanto a renovação como a reserva de uso do token.
+        # Nenhuma sessão é encerrada enquanto uma requisição ainda a utiliza.
+        while not self._token_is_fresh():
+            if self._active_metadata:
+                await self._login_idle.wait()
+                continue
+            if self._login_token:
+                await self._logout_token(self._login_token)
+                self._login_token = None
+            self._login_token = await self._do_login()
+            self._token_expires_at = time.monotonic() + TOKEN_TTL
+        return self._login_token  # type: ignore[return-value]
+
+    @asynccontextmanager
+    async def _token_lease(self, scope: Scope):
+        if scope != "metadata" or self.metadata_token:
+            yield await self._token_for(scope)
+            return
+        async with self._login_idle:
+            token = await self._ensure_token_locked()
+            self._active_metadata += 1
+        try:
+            yield token
+        finally:
+            with anyio.CancelScope(shield=True):
+                async with self._login_idle:
+                    self._active_metadata -= 1
+                    self._login_idle.notify_all()
+
+    async def _logout_token(self, token: str) -> None:
+        response = await self._http.get(
+            f"{self.base_url}/logout", headers={"Authorization": f"Bearer {token}"}
+        )
+        # Um 401 já significa que esta sessão não é mais utilizável.
+        if response.status_code != 401:
+            response.raise_for_status()
 
     async def _do_login(self) -> str:
         if not self.username or not self.password:
@@ -114,9 +143,11 @@ class MetabooksClient:
             data = response.text
         if isinstance(data, str):
             token = data.strip().strip('"')
-        else:
+        elif isinstance(data, dict):
             token = data.get("accessToken") or data.get("access_token") or data.get("token", "")
-        if not token:
+        else:
+            token = None
+        if not isinstance(token, str) or not token.strip():
             raise MetabooksError(
                 "Login bem-sucedido, mas não foi possível extrair o accessToken da resposta."
             )
@@ -132,15 +163,14 @@ class MetabooksClient:
         """
         if self.metadata_token:
             return
-        async with self._login_lock:
+        async with self._login_idle:
+            while self._active_metadata:
+                await self._login_idle.wait()
             token = self._login_token
             if not token:
                 return
             try:
-                await self._http.get(
-                    f"{self.base_url}/logout",
-                    headers={"Authorization": f"Bearer {token}"},
-                )
+                await self._logout_token(token)
             except Exception:
                 pass
             finally:
@@ -214,6 +244,65 @@ class MetabooksClient:
 
     # --- Requisições -----------------------------------------------------------
 
+    @staticmethod
+    def _retry_delay(response: httpx.Response | None, attempt: int) -> float | None:
+        value = response.headers.get("Retry-After") if response is not None else None
+        if value:
+            try:
+                delay = float(value)
+            except ValueError:
+                try:
+                    date = parsedate_to_datetime(value)
+                    delay = (date - datetime.now(timezone.utc)).total_seconds()
+                except (TypeError, ValueError, OverflowError):
+                    delay = 0.5 * 2 ** attempt
+            # Não adiantar uma repetição que o servidor pediu para fazer mais tarde.
+            if not math.isfinite(delay) or delay > MAX_RETRY_WAIT:
+                return None
+            return max(0.0, delay)
+        return 0.5 * 2 ** attempt
+
+    async def _request(self, method: str, url: str, *, sink: BinaryIO | None = None,
+                       max_bytes: int | None = None, **kwargs) -> httpx.Response:
+        safe_post = url in {
+            self._build_url("products"), self._build_url("product/multipleProducts")
+        }
+        retryable = method == "GET" or (method == "POST" and safe_post)
+        for attempt in range(MAX_RETRIES + 1):
+            response = None
+            try:
+                if sink is not None:
+                    await anyio.to_thread.run_sync(sink.seek, 0)
+                    await anyio.to_thread.run_sync(sink.truncate, 0)
+                async with self._http.stream(method, url, **kwargs) as response:
+                    response.raise_for_status()
+                    length = response.headers.get("Content-Length", "")
+                    if max_bytes is not None and length.isdigit() and int(length) > max_bytes:
+                        raise MetabooksError("Arquivo excede o limite de download permitido.")
+                    body = bytearray()
+                    count = 0
+                    async for chunk in response.aiter_bytes(64 * 1024):
+                        count += len(chunk)
+                        if max_bytes is not None and count > max_bytes:
+                            raise MetabooksError("Arquivo excede o limite de download permitido.")
+                        if sink is None:
+                            body.extend(chunk)
+                        else:
+                            await anyio.to_thread.run_sync(sink.write, chunk)
+                    headers = {key: value for key, value in response.headers.items()
+                               if key.lower() not in {"content-encoding", "content-length"}}
+                    return httpx.Response(response.status_code, headers=headers,
+                                          content=bytes(body), request=response.request)
+            except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+                transient = isinstance(exc, httpx.TransportError) or (
+                    exc.response.status_code in (429, 500, 502, 503, 504)
+                )
+                delay = self._retry_delay(response, attempt)
+                if not retryable or not transient or attempt == MAX_RETRIES or delay is None:
+                    raise
+                await asyncio.sleep(delay)
+        raise AssertionError("unreachable")
+
     async def _send(
         self,
         method: str,
@@ -223,6 +312,8 @@ class MetabooksClient:
         accept: str,
         params: dict | None = None,
         json: Any = None,
+        sink: BinaryIO | None = None,
+        max_bytes: int | None = None,
     ) -> httpx.Response:
         """Envia a requisição autenticada, renovando o token de login em 401.
 
@@ -230,26 +321,24 @@ class MetabooksClient:
         o escopo de metadados obtido por login — tokens estáticos não têm o que
         renovar.
         """
-        token = await self._token_for(scope)
-        headers = {"Authorization": f"Bearer {token}", "Accept": accept}
-        if json is not None:
-            headers["Content-Type"] = "application/json"
         can_retry = scope == "metadata" and not self.metadata_token
-        try:
-            response = await self._http.request(
-                method, url, headers=headers, params=params, json=json
-            )
-            response.raise_for_status()
-            return response
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code != 401 or not can_retry:
-                raise
-        headers["Authorization"] = f"Bearer {await self._relogin(token)}"
-        response = await self._http.request(
-            method, url, headers=headers, params=params, json=json
-        )
-        response.raise_for_status()
-        return response
+        for auth_attempt in range(2):
+            try:
+                async with self._token_lease(scope) as token:
+                    headers = {"Authorization": f"Bearer {token}", "Accept": accept}
+                    if json is not None:
+                        headers["Content-Type"] = "application/json"
+                    return await self._request(
+                        method, url, headers=headers, params=params, json=json,
+                        sink=sink, max_bytes=max_bytes,
+                    )
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code != 401 or not can_retry or auth_attempt:
+                    raise
+                async with self._login_idle:
+                    if self._login_token == token:
+                        self._token_expires_at = 0.0
+        raise AssertionError("unreachable")
 
     async def get(
         self,
@@ -279,7 +368,7 @@ class MetabooksClient:
         que o token não seja legível a partir da URL da capa.
         """
         response = await self._send(
-            "GET", self._build_url(path), scope=scope, accept=accept, params=params
+            "GET", self._build_url(path), scope=scope, accept=accept, params=params, max_bytes=MAX_INLINE_BYTES
         )
         return response.content
 
@@ -301,8 +390,25 @@ class MetabooksClient:
         """
         if not self._same_api_host(url):
             raise MetabooksError(f"URL fora da API permitida ({self.base_url}): {url}")
-        response = await self._send("GET", url, scope=scope, accept=accept, params=params)
+        response = await self._send("GET", url, scope=scope, accept=accept, params=params,
+                                    max_bytes=MAX_INLINE_BYTES)
         return response.content
+
+    @asynccontextmanager
+    async def download(self, path: str, *, scope: Scope, absolute: bool = False):
+        """Baixa em streaming para temporário, limitado a 50 MiB e fechado mesmo em erro."""
+        url = path if absolute else self._build_url(path)
+        if absolute and not self._same_api_host(url):
+            raise MetabooksError("URL fora da API permitida.")
+        file = await anyio.to_thread.run_sync(tempfile.TemporaryFile)
+        try:
+            response = await self._send("GET", url, scope=scope, accept="*/*",
+                                        sink=file, max_bytes=MAX_DOWNLOAD_BYTES)
+            await anyio.to_thread.run_sync(file.seek, 0)
+            yield file, response.headers.get("Content-Type", "")
+        finally:
+            with anyio.CancelScope(shield=True):
+                await anyio.to_thread.run_sync(file.close)
 
     async def post(
         self,

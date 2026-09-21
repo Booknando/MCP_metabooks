@@ -6,6 +6,7 @@ from mcp.server.fastmcp import FastMCP, Context
 from pydantic import Field
 
 from ..client import path_segment
+from ._errors import tool_errors, READ_ONLY
 from ._compact import compact_search, compact_list, compact_detail
 
 # Limites da API confirmados na collection Postman oficial: `page` é base 1 e
@@ -69,7 +70,8 @@ SEARCH_SYNTAX = (
 
 def register(mcp: FastMCP) -> None:
 
-    @mcp.tool()
+    @mcp.tool(structured_output=False, annotations=READ_ONLY)
+    @tool_errors
     async def metabooks_search_products(
         ctx: Context,
         search: Annotated[str, Field(description=SEARCH_SYNTAX)],
@@ -118,7 +120,8 @@ def register(mcp: FastMCP) -> None:
         termo = _title_term(search)
         return compact_search(data, termo=termo, prioritize_exact=(sort is None))
 
-    @mcp.tool()
+    @mcp.tool(structured_output=False, annotations=READ_ONLY)
+    @tool_errors
     async def metabooks_batch_search_isbns(
         ctx: Context,
         isbns: Annotated[
@@ -153,7 +156,8 @@ def register(mcp: FastMCP) -> None:
         )
         return compact_list(data)
 
-    @mcp.tool()
+    @mcp.tool(structured_output=False, annotations=READ_ONLY)
+    @tool_errors
     async def metabooks_get_product(
         ctx: Context,
         id: Annotated[
@@ -194,7 +198,8 @@ def register(mcp: FastMCP) -> None:
             return data
         return compact_detail(data)
 
-    @mcp.tool()
+    @mcp.tool(structured_output=False, annotations=READ_ONLY)
+    @tool_errors
     async def metabooks_get_multiple_products(
         ctx: Context,
         ids: Annotated[
