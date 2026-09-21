@@ -45,6 +45,10 @@ jobs:
       - name: Rodar a suíte
         run: python -m pytest -q
 
+      - name: Instalação guiada em perfil temporário
+        if: matrix.python == '3.12'
+        run: python scripts/smoke_installer.py
+
   resolucao-de-dependencias:
     name: Instalação limpa, SDK ${{ matrix.sdk }} (protege o teto do mcp)
     runs-on: ubuntu-latest

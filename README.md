@@ -18,6 +18,12 @@ Antes de começar, separe:
 
 ## Instalação passo a passo
 
+**Instalação guiada (Windows e Mac):** extraia o ZIP completo e abra
+`Instalar-Windows.cmd` ou `Instalar-Mac.command`. O assistente instala em ambiente
+isolado, pede as credenciais e configura o Claude com backup. Para atualizar,
+use `Atualizar-Windows.cmd` ou `Atualizar-Mac.command`.
+Veja [instruções e restauração](docs/instalador.md). Os passos manuais continuam abaixo.
+
 > 🍎 **No Mac?** Os caminhos e comandos são diferentes (o executável não fica no PATH do Claude Desktop). Siga o guia dedicado: **[docs/instalacao-mac.md](docs/instalacao-mac.md)**. As instruções abaixo são para **Windows**.
 
 ### Passo 1 — Instalar o Python

@@ -2,6 +2,9 @@
 
 ## 2.8.0
 
+- Adiciona instaladores guiados para Windows/macOS com ambiente isolado,
+  configuração do Claude com backup e atualização por releases do GitHub.
+
 - Corrige renovação de sessão por tempo sem deixar o token antigo aberto e sem
   interromper consultas em andamento.
 - Marca falhas de capa, mídia e consultas com `isError=true`; padroniza mensagens

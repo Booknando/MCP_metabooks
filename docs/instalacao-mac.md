@@ -1,5 +1,9 @@
 # Metabooks MCP Server: Guia de Instalação para Mac
 
+**Instalação guiada:** extraia o ZIP completo e abra `Instalar-Mac.command`.
+Para atualizar, use `Atualizar-Mac.command`. Veja o [guia do instalador](instalador.md)
+para requisitos, permissões de execução e restauração do backup.
+
 Permite que o Claude consulte o catálogo Metabooks diretamente na conversa: busque livros, veja metadados completos, capas e dados de editoras, sem sair do chat.
 
 O servidor roda no seu próprio computador. Suas credenciais Metabooks ficam salvas só na sua máquina e nunca saem dela.
